@@ -1,4 +1,5 @@
-import torch 
+import torch
+from torch import nn
 import torchvision.models as models
 from PIL import Image
 from torchvision import transforms
@@ -81,6 +82,21 @@ def ablate(state_dict, keys, num_channels=100):
     return state_dict
 
 
+def ablate_using_activations(model, input_batch, key, num_channels=100):
+    resnet_layers = nn.Sequential(*list(model.children())[:9])
+    for index, intermediate_model in enumerate(resnet_layers):
+        if index == key:
+            # Randomly ablate output channels 
+            channels = np.random.permutation(input_batch.shape[1])
+            # Set those random channels to zero 
+            input_batch[:, channels[:num_channels], :, :] = 0
+        input_batch = intermediate_model(input_batch)
+    input_batch = intermediate_model(input_batch)
+    input_batch = intermediate_model(input_batch)
+
+    return input_batch
+
+
 if __name__ == '__main__': 
     # Load pre-trained Resnet 
     model = models.resnet50(pretrained=True)
@@ -98,12 +114,15 @@ if __name__ == '__main__':
 
     probs = predict(model, input_batch)
     get_topk(probs)
+    print("------------------------------------------------------")
 
-    state_dict = model.state_dict() 
+    state_dict = model.state_dict()
     # print(state_dict.keys())
     # print(state_dict['layer3.4.conv2.weight'].shape, state_dict['layer3.4.bn2.weight'].shape)
 
     # layers = dict(model.named_modules())
+    # print(*list(model.children()))
+    # print(nn.ModuleList(list(model.children())[:23]))
     # print(layers['layer4.0.conv1'])
     # print(state_dict['layer4.0.conv1.weight'].shape)
     # print(layers['layer3.0.conv2'])
@@ -114,10 +133,20 @@ if __name__ == '__main__':
     # ablate(state_dict, keys=['layer4.0.conv1.weight'])
 
     # Ablate values 
-    state_dict_updated = ablate(state_dict, keys=['layer4.0.conv1.weight'])
-    model.load_state_dict(state_dict_updated)
+    # state_dict_updated = ablate(state_dict, keys=['layer4.0.conv1.weight'])
+    # model.load_state_dict(state_dict_updated)
+
+    # Ablate values using activation
+    # Returns output for 2nd last layer instead of last layer. So it contains 2048 neurons instead of 1000.
+    #TODO: Address this issue. Get output for last layer.
+    output = ablate_using_activations(model, input_batch, 6)
+    # print("Output shape:", output.size())
+    probs_with_ablation = torch.nn.functional.softmax(output[0], dim=0).squeeze(1).squeeze(1)
+    # print("Probs shape:", probs_with_ablation.size())
+    get_topk(probs_with_ablation)
 
     # Predict again 
-    probs = predict(model, input_batch)
-    get_topk(probs)
+    # probs = predict(model, input_batch)
+    # print(probs.size())
+    # get_topk(probs)
 
