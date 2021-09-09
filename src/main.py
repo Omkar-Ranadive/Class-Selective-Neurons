@@ -29,6 +29,7 @@ def predict(model, batch):
 
     with torch.no_grad():
         output = model(batch)
+        print("Output size:", output.size())
         # Tensor of shape 1000, with confidence scores over Imagenet's 1000 classes
         # print(output[0])
         # The output has unnormalized scores. To get probabilities, you can run a softmax on it.
@@ -82,6 +83,23 @@ def ablate(state_dict, keys, num_channels=100):
     return state_dict
 
 
+def get_children(model: torch.nn.Module):
+    # get children form model!
+    children = list(model.children())
+    flatt_children = []
+    if children == []:
+        # if model has no children; model is last child! :O
+        return model
+    else:
+       # look for children from children... to the last child!
+       for child in children:
+            try:
+                flatt_children.extend(get_children(child))
+            except TypeError:
+                flatt_children.append(get_children(child))
+    return flatt_children
+
+
 def ablate_using_activations(model, input_batch, key, num_channels=100):
     resnet_layers = nn.Sequential(*list(model.children())[:9])
     for index, intermediate_model in enumerate(resnet_layers):
@@ -91,8 +109,8 @@ def ablate_using_activations(model, input_batch, key, num_channels=100):
             # Set those random channels to zero 
             input_batch[:, channels[:num_channels], :, :] = 0
         input_batch = intermediate_model(input_batch)
-    input_batch = intermediate_model(input_batch)
-    input_batch = intermediate_model(input_batch)
+    input_batch = input_batch.transpose(1,3)
+    input_batch = model.fc(input_batch)
 
     return input_batch
 
@@ -140,9 +158,10 @@ if __name__ == '__main__':
     # Returns output for 2nd last layer instead of last layer. So it contains 2048 neurons instead of 1000.
     #TODO: Address this issue. Get output for last layer.
     output = ablate_using_activations(model, input_batch, 6)
-    # print("Output shape:", output.size())
-    probs_with_ablation = torch.nn.functional.softmax(output[0], dim=0).squeeze(1).squeeze(1)
-    # print("Probs shape:", probs_with_ablation.size())
+    output = output.reshape(1, -1)
+    print("Output shape:", output.size())
+    probs_with_ablation = torch.nn.functional.softmax(output[0], dim=0)
+    print("Probs shape:", probs_with_ablation.size())
     get_topk(probs_with_ablation)
 
     # Predict again 
