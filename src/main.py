@@ -4,28 +4,54 @@ from torch.nn.modules.activation import ReLU
 import torchvision.models as models
 from PIL import Image
 from torchvision import transforms
+import torchvision.datasets as datasets
 from torchvision.models.resnet import resnet50
-from constants import DATA_PATH
+from constants import DATA_PATH, IMGNET_PATH
 import numpy as np 
 from torchvision.models.resnet import Bottleneck as Bottleneck
+import utils 
+import time 
 
 
-def process_img(img):
-    """
-    Process the data the way the Resnet50 model requires it 
+class AverageMeter(object):
+    """Computes and stores the average and current value"""
+    def __init__(self, name, fmt=':f'):
+        self.name = name
+        self.fmt = fmt
+        self.reset()
 
-    Args:
-        img ([type]): [description]
-    """
+    def reset(self):
+        self.val = 0
+        self.avg = 0
+        self.sum = 0
+        self.count = 0
 
-    preprocess = transforms.Compose([
-    transforms.Resize(256),
-    transforms.CenterCrop(224),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-    ])
+    def update(self, val, n=1):
+        self.val = val
+        self.sum += val * n
+        self.count += n
+        self.avg = self.sum / self.count
 
-    return preprocess(img)
+    def __str__(self):
+        fmtstr = '{name} {val' + self.fmt + '} ({avg' + self.fmt + '})'
+        return fmtstr.format(**self.__dict__)
+
+
+class ProgressMeter(object):
+    def __init__(self, num_batches, meters, prefix=""):
+        self.batch_fmtstr = self._get_batch_fmtstr(num_batches)
+        self.meters = meters
+        self.prefix = prefix
+
+    def display(self, batch):
+        entries = [self.prefix + self.batch_fmtstr.format(batch)]
+        entries += [str(meter) for meter in self.meters]
+        print('\t'.join(entries))
+
+    def _get_batch_fmtstr(self, num_batches):
+        num_digits = len(str(num_batches // 1))
+        fmt = '{:' + str(num_digits) + 'd}'
+        return '[' + fmt + '/' + fmt.format(num_batches) + ']'
 
 
 def predict(model, batch): 
@@ -40,6 +66,7 @@ def predict(model, batch):
         print("Number of output probs (classes): {}".format(len(probabilities)))
 
     return probabilities
+
 
 def get_topk(probabilities, k=5):
     """
@@ -354,12 +381,76 @@ def bottleneck_layer(input_batch, child, num_channels, ablate):
 
     return out 
 
+
 def zero_out_activation(arr, num_channels):
     channels = np.random.permutation(arr.shape[1])
     # Set those random channels to zero 
     arr[:, channels[:num_channels], :, :] = 0
 
     return arr
+
+
+def validate(val_loader, model, criterion, print_freq=20):
+    batch_time = AverageMeter('Time', ':6.3f')
+    losses = AverageMeter('Loss', ':.4e')
+    top1 = AverageMeter('Acc@1', ':6.2f')
+    top5 = AverageMeter('Acc@5', ':6.2f')
+    progress = ProgressMeter(
+        len(val_loader),
+        [batch_time, losses, top1, top5],
+        prefix='Test: ')
+
+    # switch to evaluate mode
+    model.eval()
+    model.to('cuda')
+
+    with torch.no_grad():
+        end = time.time()
+        for i, (images, target) in enumerate(val_loader):
+        
+            if torch.cuda.is_available():
+                target = target.to('cuda')
+                images = images.to('cuda')
+
+            # compute output
+            output = model(images)
+            loss = criterion(output, target)
+
+            # measure accuracy and record loss
+            acc1, acc5 = accuracy(output, target, topk=(1, 5))
+            losses.update(loss.item(), images.size(0))
+            top1.update(acc1[0], images.size(0))
+            top5.update(acc5[0], images.size(0))
+
+            # measure elapsed time
+            batch_time.update(time.time() - end)
+            end = time.time()
+
+            if i % print_freq == 0:
+                progress.display(i)
+
+        # TODO: this should also be done with the ProgressMeter
+        print(' * Acc@1 {top1.avg:.3f} Acc@5 {top5.avg:.3f}'
+              .format(top1=top1, top5=top5))
+
+    return top1.avg
+
+
+def accuracy(output, target, topk=(1,)):
+    """Computes the accuracy over the k top predictions for the specified values of k"""
+    with torch.no_grad():
+        maxk = max(topk)
+        batch_size = target.size(0)
+
+        _, pred = output.topk(maxk, 1, True, True)
+        pred = pred.t()
+        correct = pred.eq(target.view(1, -1).expand_as(pred))
+
+        res = []
+        for k in topk:
+            correct_k = correct[:k].reshape(-1).float().sum(0, keepdim=True)
+            res.append(correct_k.mul_(100.0 / batch_size))
+        return res
 
 
 if __name__ == '__main__': 
@@ -370,7 +461,7 @@ if __name__ == '__main__':
 
     # Load the data 
     input_image = Image.open(DATA_PATH / 'dog.jpg')
-    input_tensor = process_img(input_image)
+    input_tensor = utils.process_img(input_image)
     input_batch = input_tensor.unsqueeze(0) # create a mini-batch as expected by the model
 
     if torch.cuda.is_available():
@@ -406,4 +497,15 @@ if __name__ == '__main__':
     probs_with_ablation = torch.nn.functional.softmax(output[0], dim=0)
     print("Probs shape:", probs_with_ablation.size())
     get_topk(probs_with_ablation)
-   
+
+    val_dir = IMGNET_PATH / 'val'
+    
+
+    # Test the validation set 
+
+    # Define loss function (criterion)
+    criterion = nn.CrossEntropyLoss().to('cuda')
+    val_loader = utils.load_imagenet_data(dir=val_dir, batch_size=512, num_workers=8)
+
+    validate(val_loader=val_loader, model=model, criterion=criterion) 
+
