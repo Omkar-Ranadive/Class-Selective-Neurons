@@ -53,7 +53,7 @@ for layer in range(4, 8):
     ablate_dict = {layer: [0, 1, 2, 3, 4, 5]}
     t1_acc = []
     t5_acc = []
-    X = list(range(0, channels[layer]+1))
+    X = list(range(0, channels[layer]+1, 10)) # Stepping the channels to speed it up 
     
 
     for nc in X: 
@@ -68,8 +68,10 @@ for layer in range(4, 8):
 
     plt.plot(X, t1_acc, label='Top 1 Acc')
     plt.plot(X, t5_acc, label='Top 5 Acc')
+    plt.title('Layer {}'.format(layer))
     plt.legend()
     plt.savefig(str(EXP_DIR / '{}_layer_{}.png'.format(datetime.now().strftime('%d_%m_%Y-%H_%M_%S'), layer)))
+    plt.clf()
 
     
 
