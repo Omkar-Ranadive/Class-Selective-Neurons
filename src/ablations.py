@@ -13,46 +13,6 @@ import utils
 import time 
 
 
-class AverageMeter(object):
-    """Computes and stores the average and current value"""
-    def __init__(self, name, fmt=':f'):
-        self.name = name
-        self.fmt = fmt
-        self.reset()
-
-    def reset(self):
-        self.val = 0
-        self.avg = 0
-        self.sum = 0
-        self.count = 0
-
-    def update(self, val, n=1):
-        self.val = val
-        self.sum += val * n
-        self.count += n
-        self.avg = self.sum / self.count
-
-    def __str__(self):
-        fmtstr = '{name} {val' + self.fmt + '} ({avg' + self.fmt + '})'
-        return fmtstr.format(**self.__dict__)
-
-
-class ProgressMeter(object):
-    def __init__(self, num_batches, meters, prefix=""):
-        self.batch_fmtstr = self._get_batch_fmtstr(num_batches)
-        self.meters = meters
-        self.prefix = prefix
-
-    def display(self, batch):
-        entries = [self.prefix + self.batch_fmtstr.format(batch)]
-        entries += [str(meter) for meter in self.meters]
-        print('\t'.join(entries))
-
-    def _get_batch_fmtstr(self, num_batches):
-        num_digits = len(str(num_batches // 1))
-        fmt = '{:' + str(num_digits) + 'd}'
-        return '[' + fmt + '/' + fmt.format(num_batches) + ']'
-
 
 def predict(model, batch): 
 
@@ -354,15 +314,13 @@ def ablate_using_activations(model, input_batch, keys, num_channels=100):
 def bottleneck_layer(input_batch, child, num_channels, ablate):
     # The bottle neck layers also follow this structure 
     # Reference:  https://pytorch.org/vision/0.8/_modules/torchvision/models/resnet.html 
+
     identity = input_batch
 
     out = child.conv1(input_batch)
     out = child.bn1(out)
     out = child.relu(out)
     
-    if ablate: 
-        out = zero_out_activation(out, num_channels)
-
     out = child.conv2(out)
     out = child.bn2(out)
     out = child.relu(out)
@@ -384,18 +342,29 @@ def bottleneck_layer(input_batch, child, num_channels, ablate):
 
 def zero_out_activation(arr, num_channels):
     channels = np.random.permutation(arr.shape[1])
+
+    # Ensure that num_channels is lower than total channels 
+    if num_channels > arr.shape[1]:
+        print("Warning: Num channels {} exceeded total channels {} ".format(num_channels, arr.shape[1])) 
+        num_channels = arr.shape[1]
+
     # Set those random channels to zero 
     arr[:, channels[:num_channels], :, :] = 0
 
     return arr
 
 
-def validate(val_loader, model, criterion, print_freq=20):
-    batch_time = AverageMeter('Time', ':6.3f')
-    losses = AverageMeter('Loss', ':.4e')
-    top1 = AverageMeter('Acc@1', ':6.2f')
-    top5 = AverageMeter('Acc@5', ':6.2f')
-    progress = ProgressMeter(
+def validate(val_loader, model, criterion, print_freq=50, ablate_dict=None, num_channels=100):
+
+    """
+    Adapted from: https://github.com/pytorch/examples/blob/master/imagenet/main.py
+    """
+
+    batch_time = utils.AverageMeter('Time', ':6.3f')
+    losses = utils.AverageMeter('Loss', ':.4e')
+    top1 = utils.AverageMeter('Acc@1', ':6.2f')
+    top5 = utils.AverageMeter('Acc@5', ':6.2f')
+    progress = utils.ProgressMeter(
         len(val_loader),
         [batch_time, losses, top1, top5],
         prefix='Test: ')
@@ -413,7 +382,12 @@ def validate(val_loader, model, criterion, print_freq=20):
                 images = images.to('cuda')
 
             # compute output
-            output = model(images)
+            if ablate_dict is not None: 
+                output = ablate_using_activations(model, images, keys=ablate_dict, num_channels=num_channels)
+
+            else: 
+                output = model(images)
+            
             loss = criterion(output, target)
 
             # measure accuracy and record loss
@@ -433,11 +407,16 @@ def validate(val_loader, model, criterion, print_freq=20):
         print(' * Acc@1 {top1.avg:.3f} Acc@5 {top5.avg:.3f}'
               .format(top1=top1, top5=top5))
 
-    return top1.avg
+    return top1.avg, top5.avg 
 
 
 def accuracy(output, target, topk=(1,)):
-    """Computes the accuracy over the k top predictions for the specified values of k"""
+    """
+    Credits : https://github.com/pytorch/examples/blob/master/imagenet/main.py
+
+    Computes the accuracy over the k top predictions for the specified values of k
+    """
+
     with torch.no_grad():
         maxk = max(topk)
         batch_size = target.size(0)
@@ -507,5 +486,7 @@ if __name__ == '__main__':
     criterion = nn.CrossEntropyLoss().to('cuda')
     val_loader = utils.load_imagenet_data(dir=val_dir, batch_size=512, num_workers=8)
 
-    validate(val_loader=val_loader, model=model, criterion=criterion) 
+    validate(val_loader=val_loader, model=model, criterion=criterion, ablate_dict={4: [0, 2]}) 
+
+
 
