@@ -12,6 +12,7 @@ import argparse
 import os 
 import logging 
 from datetime import datetime
+import numpy as np 
 
 
 parser = argparse.ArgumentParser()
@@ -73,7 +74,11 @@ for layer in range(4, 8):
     plt.savefig(str(EXP_DIR / '{}_layer_{}.png'.format(datetime.now().strftime('%d_%m_%Y-%H_%M_%S'), layer)))
     plt.clf()
 
-    
+    # Save data for future use 
+    np.save(EXP_DIR / 't1_acc_layer_{}'.format(layer), t1_acc) 
+    np.save(EXP_DIR / 't5_acc_layer_{}'.format(layer), t5_acc) 
+
+
 
 
 
