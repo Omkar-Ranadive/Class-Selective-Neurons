@@ -45,7 +45,7 @@ val_dir = IMGNET_PATH / 'val'
 
 # Define loss function (criterion)
 criterion = nn.CrossEntropyLoss().to('cuda')
-train_loader = utils.load_imagenet_data(dir=train_dir, batch_size=1, num_workers=args.num_workers)
+train_loader = utils.load_imagenet_data(dir=val_dir, batch_size=1, num_workers=args.num_workers)  # TODO: Change dir to train_dir later
 val_loader = utils.load_imagenet_data(dir=val_dir, batch_size=args.batch_size, num_workers=args.num_workers)
 
 
@@ -53,8 +53,8 @@ val_loader = utils.load_imagenet_data(dir=val_dir, batch_size=args.batch_size, n
 channels = {4: 256, 5: 512, 6: 1024, 7: 2048}
 
 # calculate class activations for all the feature maps
-val_loader = utils.load_imagenet_data(dir=val_dir, batch_size=1, num_workers=8)
-class_selectivity = get_class_selectivity(model=model, val_loader=val_loader) 
+# val_loader = utils.load_imagenet_data(dir=val_dir, batch_size=1, num_workers=8)
+class_selectivity = get_class_selectivity(model=model, val_loader=train_loader) 
 
 # Run ablations across each of the "sequential-bottleneck layers" (4 to 7)
 for layer in range(4, 8): 
