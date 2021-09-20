@@ -90,7 +90,7 @@ def get_children(model: torch.nn.Module):
     return flatt_children
 
 
-def ablate_using_activations(model, input_batch, keys, num_channels=100):
+def ablate_using_activations(model, input_batch, keys, num_channels=100, class_selectivity=None):
     """
     Ablate activations to zero (output of Relu)
 
@@ -301,7 +301,7 @@ def ablate_using_activations(model, input_batch, keys, num_channels=100):
                     # So, we only need to ablate activations in the bottleneck layer 
                     if index in keys and num in keys[index]: 
                         ablate = True 
-                    input_batch = bottleneck_layer(input_batch, child, num_channels, ablate)
+                    input_batch = bottleneck_layer(input_batch, child, num_channels, ablate, class_selectivity[index][num])
                 else: 
                     input_batch = child(input_batch)
 
@@ -311,7 +311,7 @@ def ablate_using_activations(model, input_batch, keys, num_channels=100):
     return input_batch
 
 
-def bottleneck_layer(input_batch, child, num_channels, ablate):
+def bottleneck_layer(input_batch, child, num_channels, ablate, class_selectivity=None):
     # The bottle neck layers also follow this structure 
     # Reference:  https://pytorch.org/vision/0.8/_modules/torchvision/models/resnet.html 
 
@@ -335,26 +335,35 @@ def bottleneck_layer(input_batch, child, num_channels, ablate):
     out = child.relu(out) 
 
     if ablate: 
-        out = zero_out_activation(out, num_channels)
+        out = zero_out_activation(out, num_channels, class_selectivity)
 
     return out 
 
 
-def zero_out_activation(arr, num_channels):
-    channels = np.random.permutation(arr.shape[1])
+def zero_out_activation(arr, num_channels, class_selectivity=None):
+    if class_selectivity is not None:
+        if num_channels > arr.shape[1]:
+            print("Warning: Num channels {} exceeded total channels {} ".format(num_channels, arr.shape[1])) 
+            num_channels = arr.shape[1]
+        values, indices = torch.topk(class_selectivity, num_channels)
+        arr[:, indices, :, :] = 0
 
-    # Ensure that num_channels is lower than total channels 
-    if num_channels > arr.shape[1]:
-        print("Warning: Num channels {} exceeded total channels {} ".format(num_channels, arr.shape[1])) 
-        num_channels = arr.shape[1]
+    else:
+        # Should this random permutation be computed each time? Or should this be constant?
+        channels = np.random.permutation(arr.shape[1]) 
 
-    # Set those random channels to zero 
-    arr[:, channels[:num_channels], :, :] = 0
+        # Ensure that num_channels is lower than total channels 
+        if num_channels > arr.shape[1]:
+            print("Warning: Num channels {} exceeded total channels {} ".format(num_channels, arr.shape[1])) 
+            num_channels = arr.shape[1]
+
+        # Set those random channels to zero 
+        arr[:, channels[:num_channels], :, :] = 0
 
     return arr
 
 
-def validate(val_loader, model, criterion, print_freq=50, ablate_dict=None, num_channels=100):
+def validate(val_loader, model, criterion, print_freq=50, ablate_dict=None, num_channels=100, class_selectivity=None):
 
     """
     Adapted from: https://github.com/pytorch/examples/blob/master/imagenet/main.py
@@ -383,7 +392,7 @@ def validate(val_loader, model, criterion, print_freq=50, ablate_dict=None, num_
 
             # compute output
             if ablate_dict is not None: 
-                output = ablate_using_activations(model, images, keys=ablate_dict, num_channels=num_channels)
+                output = ablate_using_activations(model, images, keys=ablate_dict, num_channels=num_channels, class_selectivity=class_selectivity)
 
             else: 
                 output = model(images)
