@@ -132,11 +132,13 @@ def get_class_selectivity(model, val_loader):
         6: {},
         7: {}
     }
-
+    # Layer_k = outer layer num, layer_v = dict of the form {class_i: {} ... } 
     for layer_k, layer_v in class_activations.items():
         # for class_k, class_v in class_activations[layer_k].items():
+        # For a layer, the number of bottleneck layers will be the same 
+        # So, just choose any class (in this case class 0) to get the index of bottleneck layers 
         for bottleneck_k, bottleneck_v in class_activations[layer_k][0].items():
-            for class_k in class_activations[layer_k].keys():
+            for class_k in sorted(class_activations[layer_k].keys()):
                 if class_k > 0:
                     all_activations_for_this_bottleneck = torch.cat((all_activations_for_this_bottleneck, class_activations[layer_k][class_k][bottleneck_k]), dim=0)
                 else:
@@ -146,7 +148,7 @@ def get_class_selectivity(model, val_loader):
 
             u_max, u_max_indices = torch.max(all_activations_for_this_bottleneck, dim=1)
             u_sum = torch.sum(all_activations_for_this_bottleneck, dim=1)
-            u_minus_max = (u_sum - u_max) / all_activations_for_this_bottleneck.shape[1]
+            u_minus_max = (u_sum - u_max) / (all_activations_for_this_bottleneck.shape[1] - 1)
 
             selectivity = (u_max - u_minus_max) / (u_max + u_minus_max + epsilon)
             
@@ -158,11 +160,13 @@ def get_class_selectivity(model, val_loader):
 if __name__ == "__main__":
     model = models.resnet50(pretrained=True)
     
-    val_dir = IMGNET_PATH / 'val'
+    val_dir = IMGNET_PATH / 'train'
 
     # Prepare validation loader
     val_loader = utils.load_imagenet_data(dir=val_dir, batch_size=1, num_workers=8)
 
-    get_class_selectivity(model=model, val_loader=val_loader) 
+    cs_dict = get_class_selectivity(model=model, val_loader=val_loader) 
     
+    utils.save_file(cs_dict, 'cs_dict_train')
+
     

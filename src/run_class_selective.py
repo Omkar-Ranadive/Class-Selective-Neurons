@@ -45,7 +45,7 @@ val_dir = IMGNET_PATH / 'val'
 
 # Define loss function (criterion)
 criterion = nn.CrossEntropyLoss().to('cuda')
-train_loader = utils.load_imagenet_data(dir=val_dir, batch_size=1, num_workers=args.num_workers)  # TODO: Change dir to train_dir later
+train_loader = utils.load_imagenet_data(dir=train_dir, batch_size=1, num_workers=args.num_workers)
 val_loader = utils.load_imagenet_data(dir=val_dir, batch_size=args.batch_size, num_workers=args.num_workers)
 
 
