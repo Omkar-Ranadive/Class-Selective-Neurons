@@ -160,13 +160,17 @@ def get_class_selectivity(model, val_loader):
 if __name__ == "__main__":
     model = models.resnet50(pretrained=True)
     
-    val_dir = IMGNET_PATH / 'train'
+    train_dir = IMGNET_PATH / 'train'
+
+    # # Prepare validation loader
+    # val_loader = utils.load_imagenet_data(dir=val_dir, batch_size=1, num_workers=8)
 
     # Prepare validation loader
-    val_loader = utils.load_imagenet_data(dir=val_dir, batch_size=1, num_workers=8)
+    train_loader = utils.load_imagenet_data(dir=train_dir, batch_size=1, num_workers=8)
 
-    cs_dict = get_class_selectivity(model=model, val_loader=val_loader) 
+
+    cs_dict = get_class_selectivity(model=model, val_loader=train_loader) 
     
-    utils.save_file(cs_dict, 'cs_dict_train')
+    utils.save_file(DATA_PATH / cs_dict, 'cs_dict_train')
 
     

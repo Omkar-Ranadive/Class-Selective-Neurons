@@ -2,7 +2,7 @@
 Perform ablations in decreasing order of class selectivity across of the layers of ResNet50 and observe the performance 
 """
 
-from constants import EXP_PATH, IMGNET_PATH 
+from constants import EXP_PATH, IMGNET_PATH, DATA_PATH
 import utils 
 from ablations import validate
 from class_selectivity import get_class_selectivity
@@ -21,6 +21,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--exp_name", type=str, required=True)
 parser.add_argument("--num_workers", default=8, type=int)
 parser.add_argument("--batch_size", default=512, type=int)
+parser.add_argument("--cs_dict", default=None, type=str) 
 
 args = parser.parse_args()
 
@@ -54,7 +55,10 @@ channels = {4: 256, 5: 512, 6: 1024, 7: 2048}
 
 # calculate class activations for all the feature maps
 # val_loader = utils.load_imagenet_data(dir=val_dir, batch_size=1, num_workers=8)
-class_selectivity = get_class_selectivity(model=model, val_loader=train_loader) 
+if not args.cs_dict: 
+    class_selectivity = get_class_selectivity(model=model, val_loader=train_loader) 
+else: 
+    class_selectivity = utils.load_file(DATA_PATH / args.cs_dict)
 
 # Run ablations across each of the "sequential-bottleneck layers" (4 to 7)
 for layer in range(4, 8): 
