@@ -28,24 +28,27 @@ def forward(model, input_batch, target, class_activations):
             for num, child in enumerate(layer.children()): 
                 if isinstance(child, Bottleneck): 
                     input_batch = bottleneck_layer(input_batch, child)
-                    activation = torch.mean(input_batch.view(input_batch.size(0), input_batch.size(1), -1), dim=2)
+                    activations = torch.mean(input_batch.view(input_batch.size(0), input_batch.size(1), -1), dim=2)
 
-                    if target[0].item() not in class_activations[index]:
-                        class_activations[index].update({target[0].item(): {}})  # ex: {layer_3: {class_0: {} } }
-                    
-                    if num in class_activations[index][target[0].item()]:
-                        class_activations[index][target[0].item()][num] += activation
-                    else:
-                        class_activations[index][target[0].item()].update({num: activation})  # ex: {layer_3: {class_0: {bottleneck_0: activation} } }
+                    for i, activation in enumerate(activations): 
+                        activation = torch.unsqueeze(activation, dim=0)
 
-                    # for k, v in class_activations.items():
-                    #     print(k, ":", v)
-                    #     for k2, v2 in class_activations[k].items():
-                    #         print(k2, ":", v2)
-                    #         for k3, v3 in class_activations[k][k2].items():
-                    #             print(k3, ":", v3)
-                    #             print("Length:", v3.shape)
-                    # exit()
+                        if target[i].item() not in class_activations[index]:
+                            class_activations[index].update({target[i].item(): {}})  # ex: {layer_3: {class_0: {} } }
+                        
+                        if num in class_activations[index][target[i].item()]:
+                            class_activations[index][target[i].item()][num] += activation
+                        else:
+                            class_activations[index][target[i].item()].update({num: activation})  # ex: {layer_3: {class_0: {bottleneck_0: activation} } }
+
+                        # for k, v in class_activations.items():
+                        #     print(k, ":", v)
+                        #     for k2, v2 in class_activations[k].items():
+                        #         print(k2, ":", v2)
+                        #         for k3, v3 in class_activations[k][k2].items():
+                        #             print(k3, ":", v3)
+                        #             print("Length:", v3.shape)
+                        # exit()
                 else: 
                     input_batch = child(input_batch)
 
@@ -158,19 +161,36 @@ def get_class_selectivity(model, val_loader):
 
 
 if __name__ == "__main__":
-    model = models.resnet50(pretrained=True)
+    # model = models.resnet50(pretrained=True)
     
-    train_dir = IMGNET_PATH / 'train'
+    # # train_dir = IMGNET_PATH / 'train'
+    # val_dir = IMGNET_PATH / 'val' 
 
-    # # Prepare validation loader
-    # val_loader = utils.load_imagenet_data(dir=val_dir, batch_size=1, num_workers=8)
+    # start_time = time.time() 
+    # # # Prepare validation loader
+    # val_loader = utils.load_imagenet_data(dir=val_dir, batch_size=256, num_workers=8)
 
-    # Prepare validation loader
-    train_loader = utils.load_imagenet_data(dir=train_dir, batch_size=1, num_workers=8)
+    # # # Prepare validation loader
+    # # # train_loader = utils.load_imagenet_data(dir=train_dir, batch_size=1, num_workers=8)
 
 
-    cs_dict = get_class_selectivity(model=model, val_loader=train_loader) 
+    # cs_dict = get_class_selectivity(model=model, val_loader=val_loader) 
     
-    utils.save_file(DATA_PATH / cs_dict, 'cs_dict_train')
+    # print("Took {} minutes: ".format((time.time() - start_time)/60))
+    
+    # utils.save_file(cs_dict, DATA_PATH / 'cs_dict_trial')
 
+    cs_dict_val = utils.load_file(DATA_PATH / 'cs_dict_val')
+    cs_dict_trial = utils.load_file(DATA_PATH / 'cs_dict_trial') 
+    # cs_train = utils.load_file(DATA_PATH / 'cs_dict_train')
+
+    # for layer in range(4, 8): 
+    #     print("For layer {}".format(layer))
+    #     for k, v in cs_dict_val[layer].items(): 
+    #         val2 = cs_dict_trial[layer][k] 
+    #         similar_sum = torch.sum(torch.isclose(v, val2, rtol=1e-3))
+    #         print(similar_sum, v.shape[0])
+    #         print(int(similar_sum.item()) == int(v.shape[0]))
+
+    
     
