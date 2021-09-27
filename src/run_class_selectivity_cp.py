@@ -60,7 +60,7 @@ loader =  utils.load_imagenet_data(dir=dir, batch_size=args.batch_size, num_work
 # Max number of channels to ablate based on the layer number (this is based on the model structure)
 channels = {4: 256, 5: 512, 6: 1024, 7: 2048}
 
-checkpoints_to_load = [i for i in range(0, 90, 10)]
+checkpoints_to_load = [i for i in range(1, 6)]
 
 # Load pre-trained Resnet 
 model = models.resnet50()
@@ -101,7 +101,7 @@ for cp in checkpoints_to_load:
         
         for nc in X: 
             t1, t5 = validate(val_loader=loader, model=model, criterion=criterion, ablate_dict=ablate_dict, num_channels=nc, class_selectivity=class_selectivity)
-            logger.info("CP {} Layer number {} Channels ablated {} T1 Acc {} T5 Acc {}".format(layer, nc, t1, t5, cp))
+            logger.info("CP {} Layer number {} Channels ablated {} T1 Acc {} T5 Acc {}".format(cp, layer, nc, t1, t5))
             t1_acc.append(t1.item()) 
             t5_acc.append(t5.item()) 
 
