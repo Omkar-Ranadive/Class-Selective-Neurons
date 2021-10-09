@@ -129,6 +129,14 @@ def get_class_selectivity(model, val_loader):
     epsilon = 1e-6
     class_activations = get_class_activations(model, val_loader)
 
+    """
+    format --> {
+        layer: {
+            bottleneck number: [class selectivity per channel]
+            }
+        }
+    """
+
     class_selectivity = {
         4: {},
         5: {},
@@ -182,6 +190,7 @@ if __name__ == "__main__":
 
     cs_dict_val = utils.load_file(DATA_PATH / 'cs_dict_val')
     cs_dict_trial = utils.load_file(DATA_PATH / 'cs_dict_trial') 
+    cs_dict_val0 = utils.load_file(DATA_PATH / 'cs_dict_val_cp0')
     # cs_train = utils.load_file(DATA_PATH / 'cs_dict_train')
 
     # for layer in range(4, 8): 
@@ -192,5 +201,13 @@ if __name__ == "__main__":
     #         print(similar_sum, v.shape[0])
     #         print(int(similar_sum.item()) == int(v.shape[0]))
 
-    
-    
+    for layer in range(4, 8): 
+        print("For layer {}".format(layer))
+        for k, v in cs_dict_val[layer].items(): 
+            val2 = cs_dict_val0[layer][k] 
+            # similar_sum = torch.sum(torch.isclose(v, val2, rtol=1e-3))
+            # print(similar_sum, v.shape[0])
+            # print(int(similar_sum.item()) == int(v.shape[0]))
+            print(v.shape, val2.shape)
+
+        

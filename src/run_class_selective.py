@@ -82,7 +82,7 @@ for layer in range(4, 8):
     plt.plot(X, t5_acc, label='Top 5 Acc')
     plt.title('Layer {}'.format(layer))
     plt.legend()
-    plt.savefig(str(EXP_DIR / '{}_layer_{}.png'.format(datetime.now().strftime('%d_%m_%Y-%H_%M_%S'), layer)))
+    plt.savefig(str(EXP_DIR / '{}_layer_{}.png'.format(datetime.now().strftime('%m_%d_%Y-%H_%M_%S'), layer)))
     plt.clf()
 
     # Save data for future use 

@@ -60,7 +60,7 @@ loader =  utils.load_imagenet_data(dir=dir, batch_size=args.batch_size, num_work
 # Max number of channels to ablate based on the layer number (this is based on the model structure)
 channels = {4: 256, 5: 512, 6: 1024, 7: 2048}
 
-checkpoints_to_load = [i for i in range(1, 6)]
+checkpoints_to_load = [i for i in range(12, 16)]
 
 # Load pre-trained Resnet 
 model = models.resnet50()
@@ -113,7 +113,7 @@ for cp in checkpoints_to_load:
         plt.plot(X, t5_acc, label='Top 5 Acc')
         plt.title('Layer {}'.format(layer))
         plt.legend()
-        plt.savefig(str(EXP_DIR / '{}_cp{}_layer_{}.png'.format(datetime.now().strftime('%d_%m_%Y-%H_%M_%S'), cp, layer)))
+        plt.savefig(str(EXP_DIR / '{}_cp{}_layer_{}.png'.format(datetime.now().strftime('%m_%d_%Y-%H_%M_%S'), cp, layer)))
         plt.clf()
 
         # Save data for future use 

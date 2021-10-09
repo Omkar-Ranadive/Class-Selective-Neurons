@@ -27,12 +27,12 @@ def normal_vis():
 
         plt.title('Layer {}'.format(layer))
         plt.legend()
-        plt.savefig(str(EXP_DIR_CS / '{}_layer_{}.png'.format(datetime.now().strftime('%d_%m_%Y-%H_%M_%S'), layer)))
+        plt.savefig(str(EXP_DIR_CS / '{}_layer_{}.png'.format(datetime.now().strftime('%m_%d_%Y-%H_%M_%S'), layer)))
         plt.clf()
 
 
 def cp_vis(): 
-    checkpoints = [i for i in range(1, 4)]
+    checkpoints = [i for i in range(0, 16)]
 
     for cp in checkpoints: 
         for layer in range(4, 8): 
@@ -56,7 +56,7 @@ def cp_vis():
 
             plt.title('CP {} Layer {}'.format(cp, layer))
             plt.legend()
-            plt.savefig(str(EXP_DIR_CS / '{}_cp{}_combined_layer_{}.png'.format(datetime.now().strftime('%d_%m_%Y-%H_%M_%S'), cp, layer)))
+            plt.savefig(str(EXP_DIR_CS / '{}_cp{}_combined_layer_{}.png'.format(datetime.now().strftime('%m_%d_%Y-%H_%M_%S'), cp, layer)))
             plt.clf()
 
 
