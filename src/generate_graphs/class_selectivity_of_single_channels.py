@@ -24,7 +24,9 @@ EXP_DIR = EXP_PATH / args.exp_name
 os.makedirs(EXP_DIR, exist_ok=True)
 
 channels = {4: 256, 5: 512, 6: 1024, 7: 2048}
-checkpoints_to_load = [i for i in range(0, 16)]
+check_min = 0 
+check_max = 16 
+checkpoints_to_load = [i for i in range(check_min, check_max)]
 
 cs_for_every_cp = []
 
@@ -50,4 +52,7 @@ for l, c in channels.items():
             plt.ylabel('Class Selectivity Index')
             plt.plot(checkpoints_to_load, cs_for_channel, label='CS for Channel {}'.format(i))
             plt.title('Layer {} -- Bottleneck {} -- Channel {} -- Class Selectivity per Checkpoint'.format(l, b, i))
-            plt.savefig(CHANNEL_PATH / '{}_channel_{}_cp{}_to_cp{}.png'.format(datetime.now().strftime('%m_%d_%Y-%H_%M_%S'), i, min(checkpoints_to_load), max(checkpoints_to_load)))
+            plt.savefig(CHANNEL_PATH / '{}_channel_{}_cp{}_to_cp{}.png'.format(datetime.now().strftime('%m_%d_%Y-%H_%M_%S'), i, check_min, check_max))
+            plt.clf()
+
+            np.save(CHANNEL_PATH / 'layer{}_bottleneck{}_channel{}_cp{}_to_cp{}'.format(l, b, i, check_min, check_max), cs_for_channel)
