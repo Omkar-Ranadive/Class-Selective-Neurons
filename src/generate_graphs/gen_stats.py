@@ -31,7 +31,7 @@ checkpoints_to_load = [i for i in range(check_min, check_max)]
 cs_for_every_cp = []
 
 # Setup logger 
-logging.basicConfig(level=logging.INFO, filename=str(EXP_DIR / 'info.log'), format='%(asctime)s %(message)s')
+logging.basicConfig(level=logging.INFO, filename=str(EXP_DIR / 'info.log'), format='%(asctime)s %(message)s', filemode='w')
 logger=logging.getLogger() 
 
 
@@ -62,9 +62,12 @@ for l, c in channels.items():
                 increased += 1 
             else: 
                 decreased += 1 
+            
 
+            in_per = increased/(increased+decreased)
+            dec_per = 1.0 - in_per 
         
-        logger.info("Layer: {}  Bottleneck Layer: {}  CS Increased: {} CS Decreased: {}".format(l, b, increased, decreased))
+        logger.info("Layer: {}  Bottleneck Layer: {}  CS Increased: {} CS Decreased: {}  % increase {:.2%}  % decrease {:.2%}".format(l, b, increased, decreased, in_per, dec_per))
 
             
 
