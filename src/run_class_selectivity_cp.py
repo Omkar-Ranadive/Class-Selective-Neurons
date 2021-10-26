@@ -60,7 +60,7 @@ loader =  utils.load_imagenet_data(dir=dir, batch_size=args.batch_size, num_work
 # Max number of channels to ablate based on the layer number (this is based on the model structure)
 channels = {4: 256, 5: 512, 6: 1024, 7: 2048}
 
-checkpoints_to_load = [i for i in range(18, 20)]
+checkpoints_to_load = [i for i in range(25, 27)]
 
 # Load pre-trained Resnet 
 model = models.resnet50()
