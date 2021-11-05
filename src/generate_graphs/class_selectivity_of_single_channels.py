@@ -46,7 +46,7 @@ for l, c in channels.items():
             CHANNEL_PATH = BOTTLENECK_LAYER_PATH / "channel_{}".format(i)
             os.makedirs(CHANNEL_PATH, exist_ok=True)
 
-            cs_for_channel = [cs_for_every_cp[x][l][b][i].cpu().numpy() for x in range(len(cs_for_every_cp))]
+            cs_for_channel = [cs_for_every_cp[x][l][b][i].item() for x in range(len(cs_for_every_cp))]
             
             plt.xlabel('Checkpoints')
             plt.ylabel('Class Selectivity Index')

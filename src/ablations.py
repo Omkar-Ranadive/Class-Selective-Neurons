@@ -90,7 +90,7 @@ def get_children(model: torch.nn.Module):
     return flatt_children
 
 
-def ablate_using_activations(model, input_batch, keys, num_channels=100, class_selectivity=None):
+def ablate_using_activations(model, input_batch, keys, num_channels=100, class_selectivity=None, indices=None):
     """
     Ablate activations to zero (output of Relu)
 
@@ -301,8 +301,9 @@ def ablate_using_activations(model, input_batch, keys, num_channels=100, class_s
                     # So, we only need to ablate activations in the bottleneck layer 
                     if index in keys and num in keys[index]: 
                         ablate = True 
-                    if class_selectivity is not None: 
-                        input_batch = bottleneck_layer(input_batch, child, num_channels, ablate, class_selectivity[index][num])
+                        if class_selectivity is not None: 
+                            input_batch = bottleneck_layer(input_batch, child, num_channels, 
+                            ablate, class_selectivity[index][num], indices[num])
                     else: 
                         input_batch = bottleneck_layer(input_batch, child, num_channels, ablate)
                 else: 
@@ -314,7 +315,7 @@ def ablate_using_activations(model, input_batch, keys, num_channels=100, class_s
     return input_batch
 
 
-def bottleneck_layer(input_batch, child, num_channels, ablate, class_selectivity=None):
+def bottleneck_layer(input_batch, child, num_channels, ablate, class_selectivity=None, indices=None):
     # The bottle neck layers also follow this structure 
     # Reference:  https://pytorch.org/vision/0.8/_modules/torchvision/models/resnet.html 
 
@@ -338,18 +339,23 @@ def bottleneck_layer(input_batch, child, num_channels, ablate, class_selectivity
     out = child.relu(out) 
 
     if ablate: 
-        out = zero_out_activation(out, num_channels, class_selectivity)
+        out = zero_out_activation(out, num_channels, class_selectivity, indices)
 
     return out 
 
 
-def zero_out_activation(arr, num_channels, class_selectivity=None):
+def zero_out_activation(arr, num_channels, class_selectivity=None, indices=None):
     if class_selectivity is not None:
-        if num_channels > arr.shape[1]:
-            print("Warning: Num channels {} exceeded total channels {} ".format(num_channels, arr.shape[1])) 
-            num_channels = arr.shape[1]
-        values, indices = torch.topk(class_selectivity, num_channels)
-        arr[:, indices, :, :] = 0
+        # If user has already provided the indices to ablate, use those 
+        if indices is not None: 
+            arr[:, indices, :, :] = 0
+        # Else, choose top k class selective channels (k = num channels)
+        else:
+            if num_channels > arr.shape[1]:
+                print("Warning: Num channels {} exceeded total channels {} ".format(num_channels, arr.shape[1])) 
+                num_channels = arr.shape[1]
+            values, indices = torch.topk(class_selectivity, num_channels)
+            arr[:, indices, :, :] = 0
 
     else:
         # Should this random permutation be computed each time? Or should this be constant?
@@ -366,7 +372,7 @@ def zero_out_activation(arr, num_channels, class_selectivity=None):
     return arr
 
 
-def validate(val_loader, model, criterion, print_freq=50, ablate_dict=None, num_channels=100, class_selectivity=None):
+def validate(val_loader, model, criterion, print_freq=50, ablate_dict=None, num_channels=100, class_selectivity=None, indices=None):
 
     """
     Adapted from: https://github.com/pytorch/examples/blob/master/imagenet/main.py
@@ -395,7 +401,8 @@ def validate(val_loader, model, criterion, print_freq=50, ablate_dict=None, num_
 
             # compute output
             if ablate_dict is not None: 
-                output = ablate_using_activations(model, images, keys=ablate_dict, num_channels=num_channels, class_selectivity=class_selectivity)
+                output = ablate_using_activations(model, images, keys=ablate_dict, num_channels=num_channels,
+                 class_selectivity=class_selectivity, indices=indices)
 
             else: 
                 output = model(images)

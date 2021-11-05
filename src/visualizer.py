@@ -60,6 +60,31 @@ def cp_vis():
             plt.clf()
 
 
+def pop_vis(): 
+    cp = 35
+
+    for layer in range(4, 8):
+        t1_top = np.load(EXP_DIR_CS / 't1_acc_cp{}_layer_{}_{}.npy'.format(cp, layer, 'top')) 
+        t5_top = np.load(EXP_DIR_CS / 't5_acc_cp{}_layer_{}_{}.npy'.format(cp, layer, 'top')) 
+
+        t1_bot = np.load(EXP_DIR_CS / 't1_acc_cp{}_layer_{}_{}.npy'.format(cp, layer, 'bottom')) 
+        t5_bot = np.load(EXP_DIR_CS / 't5_acc_cp{}_layer_{}_{}.npy'.format(cp, layer, 'bottom'))
+
+        X = range(0, cp+1)
+        # Plot accuracies for both class selective and random on the same figure 
+        plt.xlabel('Checkpoints')
+        plt.ylabel('Accuracy')
+
+        plt.plot(X, t1_top, label='T1 (Top)')
+        plt.plot(X, t5_top, label='T5 (Top)')
+        plt.plot(X, t1_bot, label='T1 (Bottom)')
+        plt.plot(X, t5_bot, label='T5 (Bottom)')
+
+        plt.title('Pop compare: Layer {}'.format(layer))
+        plt.legend()
+        plt.savefig(str(EXP_DIR_CS / '{}_cp{}_combined_layer_{}.png'.format(datetime.now().strftime('%m_%d_%Y-%H_%M_%S'), cp, layer)))
+        plt.clf()
+
 
 
 if __name__ == '__main__': 
@@ -80,3 +105,5 @@ if __name__ == '__main__':
         normal_vis() 
     elif args.vis == 'cp': 
         cp_vis() 
+    elif args.vis == 'pop':
+        pop_vis()

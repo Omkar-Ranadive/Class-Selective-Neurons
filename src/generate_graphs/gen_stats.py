@@ -64,9 +64,8 @@ for l, c in channels.items():
                 decreased += 1 
             
 
-            in_per = increased/(increased+decreased)
-            dec_per = 1.0 - in_per 
-        
+        in_per = increased/(increased+decreased)
+        dec_per = 1.0 - in_per 
         logger.info("Layer: {}  Bottleneck Layer: {}  CS Increased: {} CS Decreased: {}  % increase {:.2%}  % decrease {:.2%}".format(l, b, increased, decreased, in_per, dec_per))
 
             

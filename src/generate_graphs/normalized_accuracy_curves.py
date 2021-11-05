@@ -36,7 +36,7 @@ for cp_file in checkpoint_files:
 accuracy_type = ['t1', 't5']
 
 # Set up the correct color palette - To avoid repeating on colors for plots with large number of lines
-plt.style.use('fivethirtyeight')
+# plt.style.use('fivethirtyeight')
 number_of_plots = len(checkpoints)
 colors = sns.color_palette("hls", number_of_plots)
 # colors = sns.color_palette("flare", as_cmap=True)
