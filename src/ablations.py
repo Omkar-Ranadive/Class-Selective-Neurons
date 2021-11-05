@@ -301,9 +301,13 @@ def ablate_using_activations(model, input_batch, keys, num_channels=100, class_s
                     # So, we only need to ablate activations in the bottleneck layer 
                     if index in keys and num in keys[index]: 
                         ablate = True 
-                        if class_selectivity is not None: 
+                    if class_selectivity is not None: 
+                        if indices is not None: 
                             input_batch = bottleneck_layer(input_batch, child, num_channels, 
                             ablate, class_selectivity[index][num], indices[num])
+                        else: 
+                            input_batch = bottleneck_layer(input_batch, child, num_channels, 
+                            ablate, class_selectivity[index][num])
                     else: 
                         input_batch = bottleneck_layer(input_batch, child, num_channels, ablate)
                 else: 

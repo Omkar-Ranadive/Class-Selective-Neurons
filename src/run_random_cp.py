@@ -19,6 +19,8 @@ parser.add_argument("--exp_name", type=str, required=True)
 parser.add_argument("--num_workers", default=8, type=int)
 parser.add_argument("--batch_size", default=512, type=int)
 parser.add_argument("--loader", default='val', type=str)
+parser.add_argument("--check_min", required=True, type=int)
+parser.add_argument("--check_max", required=True, type=int)
 args = parser.parse_args()
 
 
@@ -60,7 +62,7 @@ loader =  utils.load_imagenet_data(dir=dir, batch_size=args.batch_size, num_work
 # Max number of channels to ablate based on the layer number (this is based on the model structure)
 channels = {4: 256, 5: 512, 6: 1024, 7: 2048}
 
-checkpoints_to_load = [i for i in range(31, 36)]
+checkpoints_to_load = [i for i in range(args.check_min, args.check_max)]
 
 # Load pre-trained Resnet 
 model = models.resnet50()
