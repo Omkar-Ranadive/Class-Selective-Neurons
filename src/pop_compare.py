@@ -19,7 +19,9 @@ parser.add_argument("--exp_name", type=str, required=True)
 parser.add_argument("--num_workers", default=8, type=int)
 parser.add_argument("--batch_size", default=512, type=int)
 parser.add_argument("--loader", default='val', type=str)
-parser.add_argument("--section", required=True, type=str)
+parser.add_argument("--check_min", required=True, type=int)
+parser.add_argument("--check_max", required=True, type=int)
+parser.add_argument("--split_per", default=0.5, type=float)
 args = parser.parse_args()
 
 
@@ -60,82 +62,83 @@ loader =  utils.load_imagenet_data(dir=dir, batch_size=args.batch_size, num_work
 # Max number of channels to ablate based on the layer number (this is based on the model structure)
 channels = {4: 256, 5: 512, 6: 1024, 7: 2048}
 
-check_min = 0 
-check_max = 36 
-checkpoints_to_load = [i for i in range(0, 36)]
+
+checkpoints_to_load = [i for i in range(args.check_min, args.check_max)]
 
 # Load pre-trained Resnet 
 model = models.resnet50()
 model_dict = model.state_dict() 
+sections = ['top', 'bottom']
 
-# Run the code for the top 50% class selective neurons 
-logger.info("Running code for {} half of class selective neurons".format(args.section))
+for section in sections: 
+    # Run the code for the top 50% class selective neurons 
+    logger.info("Running code for {} half of class selective neurons".format(section))
 
-for layer in range(4, 8): 
-    ablate_dict = {layer: [0, 1, 2, 3, 4, 5]}
-    t1_acc = []
-    t5_acc = []
-    for cp in checkpoints_to_load: 
-        checkpoint = torch.load(DATA_PATH / 'model_checkpoints' / 'CHECKPOINTS' / 'EXPE1' / 'checkpoint_epoch{}.pth.tar'.format(cp))
+    for layer in range(4, 8): 
+        ablate_dict = {layer: [0, 1, 2, 3, 4, 5]}
+        t1_acc = []
+        t5_acc = []
+        for cp in checkpoints_to_load: 
+            checkpoint = torch.load(DATA_PATH / 'model_checkpoints' / 'CHECKPOINTS' / 'EXPE1' / 'checkpoint_epoch{}.pth.tar'.format(cp))
 
-        # Load checkpoint state dict into the model 
-        """
-        The key values in checkpoint have different key names, they have an additional "module." in their name 
-        Therefore, cleaning the keys before updating state dict of the model 
-        """
+            # Load checkpoint state dict into the model 
+            """
+            The key values in checkpoint have different key names, they have an additional "module." in their name 
+            Therefore, cleaning the keys before updating state dict of the model 
+            """
 
-        for key in checkpoint['state_dict'].keys(): 
-            model_key = key.replace("module.", "")
-            model_dict[model_key] = checkpoint['state_dict'][key] 
+            for key in checkpoint['state_dict'].keys(): 
+                model_key = key.replace("module.", "")
+                model_dict[model_key] = checkpoint['state_dict'][key] 
 
-        model.load_state_dict(model_dict)
-        model.eval()
-        
-        # calculate class activations for all the feature maps
-        # val_loader = utils.load_imagenet_data(dir=val_dir, batch_size=1, num_workers=8)
-        cs_dict_path = DATA_PATH / 'cs_dict_{}_cp{}'.format(args.loader, cp)
-        if not cs_dict_path.is_file(): 
-            class_selectivity = get_class_selectivity(model=model, val_loader=loader_cp) 
-            utils.save_file(class_selectivity, DATA_PATH / 'cs_dict_{}_cp{}'.format(args.loader, cp))
-        else: 
-            class_selectivity = utils.load_file(cs_dict_path)
+            model.load_state_dict(model_dict)
+            model.eval()
+            
+            # calculate class activations for all the feature maps
+            # val_loader = utils.load_imagenet_data(dir=val_dir, batch_size=1, num_workers=8)
+            cs_dict_path = DATA_PATH / 'cs_dict_{}_cp{}'.format(args.loader, cp)
+            if not cs_dict_path.is_file(): 
+                class_selectivity = get_class_selectivity(model=model, val_loader=loader_cp) 
+                utils.save_file(class_selectivity, DATA_PATH / 'cs_dict_{}_cp{}'.format(args.loader, cp))
+            else: 
+                class_selectivity = utils.load_file(cs_dict_path)
 
-        # Key = bottleneck number, value = indices to ablate 
-        indices_top = {} 
-        indices_bottom = {}
+            # Key = bottleneck number, value = indices to ablate 
+            indices_top = {} 
+            indices_bottom = {}
 
-        for bn in ablate_dict[layer]: 
-            if bn in class_selectivity[layer]: 
-                cs_bn = class_selectivity[layer][bn].cpu().numpy()
-                sorted_index = np.argsort(-cs_bn) 
-                half = len(cs_bn)//2
-                cs_top = sorted_index[:half] 
-                cs_bottom = sorted_index[half: ]
-                indices_top[bn] = cs_top
-                indices_bottom[bn] = cs_bottom 
-        
-        indices = indices_top if args.section == 'top' else indices_bottom
+            for bn in ablate_dict[layer]: 
+                if bn in class_selectivity[layer]: 
+                    cs_bn = class_selectivity[layer][bn].cpu().numpy()
+                    sorted_index = np.argsort(-cs_bn) 
+                    split_index = int(len(cs_bn) * args.split_per)
+                    cs_top = sorted_index[:split_index] 
+                    cs_bottom = sorted_index[-split_index: ]
+                    indices_top[bn] = cs_top
+                    indices_bottom[bn] = cs_bottom 
+            
+            indices = indices_top if section == 'top' else indices_bottom
 
-        t1, t5 = validate(val_loader=loader, model=model, criterion=criterion, ablate_dict=ablate_dict, num_channels=-1, 
-        class_selectivity=class_selectivity, indices=indices)
+            t1, t5 = validate(val_loader=loader, model=model, criterion=criterion, ablate_dict=ablate_dict, num_channels=-1, 
+            class_selectivity=class_selectivity, indices=indices)
 
-        logger.info("CP {} Layer number {}  T1 Acc {:.4f} T5 Acc {:.4f}".format(cp, layer, t1, t5))
-        t1_acc.append(t1.item()) 
-        t5_acc.append(t5.item()) 
+            logger.info("CP {} Layer number {}  T1 Acc {:.4f} T5 Acc {:.4f}".format(cp, layer, t1, t5))
+            t1_acc.append(t1.item()) 
+            t5_acc.append(t5.item()) 
 
 
 
-    # For the current layer, plot num channels vs accuracy and save the plot 
-    plt.xlabel('Checkpoints')
-    plt.ylabel('Accuracy')
+        # For the current layer, plot num channels vs accuracy and save the plot 
+        plt.xlabel('Checkpoints')
+        plt.ylabel('Accuracy')
 
-    plt.plot(range(check_min, check_max), t1_acc, label='Top 1 Acc')
-    plt.plot(range(check_min, check_max), t5_acc, label='Top 5 Acc')
-    plt.title('Layer {}  {} 50%'.format(layer, args.section))
-    plt.legend()
-    plt.savefig(str(EXP_DIR / '{}_cp{}_layer_{}_{}.png'.format(datetime.now().strftime('%m_%d_%Y-%H_%M_%S'), cp, layer, args.section)))
-    plt.clf()
+        plt.plot(range(args.check_min, args.check_max), t1_acc, label='Top 1 Acc')
+        plt.plot(range(args.check_min, args.check_max), t5_acc, label='Top 5 Acc')
+        plt.title('Layer {}  {}  {}%'.format(layer, section, args.split_per*100))
+        plt.legend()
+        plt.savefig(str(EXP_DIR / '{}_cp{}_cp{}_layer_{}_{}.png'.format(datetime.now().strftime('%m_%d_%Y-%H_%M_%S'), args.check_min, args.check_max, layer, section)))
+        plt.clf()
 
-    # Save data for future use 
-    np.save(EXP_DIR / 't1_acc_cp{}_layer_{}_{}'.format(cp, layer, args.section), t1_acc) 
-    np.save(EXP_DIR / 't5_acc_cp{}_layer_{}_{}'.format(cp, layer, args.section), t5_acc) 
+        # Save data for future use 
+        np.save(EXP_DIR / 't1_acc_cp{}_cp{}_layer_{}_{}_split_{}'.format(args.check_min, args.check_max, layer, section, args.split_per), t1_acc) 
+        np.save(EXP_DIR / 't5_acc_cp{}_cp{}_layer_{}_{}_split_{}'.format(args.check_min, args.check_max, layer, section, args.split_per), t5_acc) 

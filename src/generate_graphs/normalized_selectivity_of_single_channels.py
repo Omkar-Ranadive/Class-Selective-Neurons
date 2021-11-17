@@ -18,15 +18,28 @@ parser.add_argument("--exp_name", type=str, required=True)
 parser.add_argument("--num_workers", default=8, type=int)
 parser.add_argument("--batch_size", default=512, type=int)
 parser.add_argument("--loader", default='val', type=str)
+parser.add_argument("--check_min", required=True, type=int)
+parser.add_argument("--check_max", required=True, type=int)
+parser.add_argument("--save_dir", default=None, type=str)
+
+
 args = parser.parse_args()
+
 
 EXP_DIR = EXP_PATH / args.exp_name 
 os.makedirs(EXP_DIR, exist_ok=True)
 
+
+if args.save_dir is not None: 
+    SAVE_DIR = EXP_PATH / args.save_dir 
+
+
+os.makedirs(SAVE_DIR, exist_ok=True)
+
+
 channels = {4: 256, 5: 512, 6: 1024, 7: 2048}
-check_min = 0 
-check_max = 16 
-checkpoints_to_load = [i for i in range(check_min, check_max)]
+
+checkpoints_to_load = [i for i in range(args.check_min, args.check_max)]
 
 cs_for_every_cp = []
 
@@ -61,7 +74,7 @@ for l, c in channels.items():
             os.makedirs(CHANNEL_PATH, exist_ok=True)
 
 
-            cs_for_channel = np.load(CHANNEL_PATH / 'layer{}_bottleneck{}_channel{}_cp{}_to_cp{}.npy'.format(l, b, i, check_min, check_max))
+            cs_for_channel = np.load(CHANNEL_PATH / 'layer{}_bottleneck{}_channel{}_cp{}_to_cp{}.npy'.format(l, b, i, args.check_min, args.check_max))
             
             cs_for_channel_norm = (cs_for_channel - np.min(cs_for_channel)) / (np.max(cs_for_channel) - np.min(cs_for_channel))            
 
@@ -79,9 +92,10 @@ for l, c in channels.items():
             ax2.plot(checkpoints_to_load, cs_for_channel_norm, label='CS for Channel {}'.format(i))
             ax2.set_title('Layer {} -- Bottleneck {}  -- Class Selectivity per Checkpoint'.format(l, b))
 
-
-        fig1.savefig(BOTTLENECK_LAYER_PATH / '{}_bn{}_cp{}_to_cp{}.png'.format(datetime.now().strftime('%m_%d_%Y-%H_%M_%S'), b, check_min, check_max))
-        fig2.savefig(BOTTLENECK_LAYER_PATH / '{}_bn{}_cp{}_to_cp{}_norm.png'.format(datetime.now().strftime('%m_%d_%Y-%H_%M_%S'), b, check_min, check_max))
+        if args.save_dir is None: 
+            SAVE_DIR = BOTTLENECK_LAYER_PATH 
+        fig1.savefig(SAVE_DIR / '{}_l_{}_bn{}_cp{}_to_cp{}.png'.format(datetime.now().strftime('%m_%d_%Y-%H_%M_%S'), l, b, args.check_min, args.check_max))
+        # fig2.savefig(SAVE_DIR / '{}_bn{}_cp{}_to_cp{}_norm.png'.format(datetime.now().strftime('%m_%d_%Y-%H_%M_%S'), b, args.check_min, args.check_max))
 
         ax1.clear()
         ax2.clear()

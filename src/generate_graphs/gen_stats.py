@@ -15,23 +15,33 @@ import logging
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--exp_name", type=str, required=True)
-parser.add_argument("--num_workers", default=8, type=int)
-parser.add_argument("--batch_size", default=512, type=int)
 parser.add_argument("--loader", default='val', type=str)
+parser.add_argument("--check_min", required=True, type=int)
+parser.add_argument("--check_max", required=True, type=int)
+parser.add_argument("--save_dir", default=None, type=str)
+
 args = parser.parse_args()
 
 EXP_DIR = EXP_PATH / args.exp_name 
 os.makedirs(EXP_DIR, exist_ok=True)
 
+if args.save_dir is not None: 
+    SAVE_DIR = EXP_PATH / args.save_dir 
+else: 
+    SAVE_DIR = EXP_DIR 
+
+os.makedirs(SAVE_DIR, exist_ok=True)
+
+
 channels = {4: 256, 5: 512, 6: 1024, 7: 2048}
-check_min = 0 
-check_max = 16 
-checkpoints_to_load = [i for i in range(check_min, check_max)]
+
+
+checkpoints_to_load = [i for i in range(args.check_min, args.check_max)]
 
 cs_for_every_cp = []
 
 # Setup logger 
-logging.basicConfig(level=logging.INFO, filename=str(EXP_DIR / 'info.log'), format='%(asctime)s %(message)s', filemode='w')
+logging.basicConfig(level=logging.INFO, filename=str(SAVE_DIR / 'info.log'), format='%(asctime)s %(message)s', filemode='w')
 logger=logging.getLogger() 
 
 
@@ -53,7 +63,7 @@ for l, c in channels.items():
             CHANNEL_PATH = BOTTLENECK_LAYER_PATH / "channel_{}".format(i)
             os.makedirs(CHANNEL_PATH, exist_ok=True)
 
-            cs_for_channel = np.load(CHANNEL_PATH / 'layer{}_bottleneck{}_channel{}_cp{}_to_cp{}.npy'.format(l, b, i, check_min, check_max))
+            cs_for_channel = np.load(CHANNEL_PATH / 'layer{}_bottleneck{}_channel{}_cp{}_to_cp{}.npy'.format(l, b, i, args.check_min, args.check_max))
             half = len(cs_for_channel)//2 
             first_half_mean = np.mean(cs_for_channel[ :half])
             second_half_mean = np.mean(cs_for_channel[half: ])

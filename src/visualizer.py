@@ -3,6 +3,7 @@ import numpy as np
 from constants import EXP_PATH, DATA_PATH
 from datetime import datetime
 import argparse 
+import os 
 
 
 def normal_vis(): 
@@ -27,12 +28,12 @@ def normal_vis():
 
         plt.title('Layer {}'.format(layer))
         plt.legend()
-        plt.savefig(str(EXP_DIR_CS / '{}_layer_{}.png'.format(datetime.now().strftime('%m_%d_%Y-%H_%M_%S'), layer)))
+        plt.savefig(str(SAVE_DIR / '{}_layer_{}.png'.format(datetime.now().strftime('%m_%d_%Y-%H_%M_%S'), layer)))
         plt.clf()
 
 
 def cp_vis(): 
-    checkpoints = [i for i in range(0, 16)]
+    checkpoints = [i for i in range(args.check_min, args.check_max)]
 
     for cp in checkpoints: 
         for layer in range(4, 8): 
@@ -56,33 +57,39 @@ def cp_vis():
 
             plt.title('CP {} Layer {}'.format(cp, layer))
             plt.legend()
-            plt.savefig(str(EXP_DIR_CS / '{}_cp{}_combined_layer_{}.png'.format(datetime.now().strftime('%m_%d_%Y-%H_%M_%S'), cp, layer)))
+            plt.savefig(str(SAVE_DIR / '{}_cp{}_combined_layer_{}.png'.format(datetime.now().strftime('%m_%d_%Y-%H_%M_%S'), cp, layer)))
             plt.clf()
 
 
 def pop_vis(): 
-    cp = 35
 
     for layer in range(4, 8):
-        t1_top = np.load(EXP_DIR_CS / 't1_acc_cp{}_layer_{}_{}.npy'.format(cp, layer, 'top')) 
-        t5_top = np.load(EXP_DIR_CS / 't5_acc_cp{}_layer_{}_{}.npy'.format(cp, layer, 'top')) 
+        t1_top = np.load(EXP_DIR_CS / 't1_acc_cp{}_cp{}_layer_{}_{}_split_{}.npy'.format(args.check_min,
+         args.check_max, layer, 'top', args.split_per)) 
+        t5_top = np.load(EXP_DIR_CS / 't5_acc_cp{}_cp{}_layer_{}_{}_split_{}.npy'.format(args.check_min,
+         args.check_max, layer, 'top', args.split_per)) 
 
-        t1_bot = np.load(EXP_DIR_CS / 't1_acc_cp{}_layer_{}_{}.npy'.format(cp, layer, 'bottom')) 
-        t5_bot = np.load(EXP_DIR_CS / 't5_acc_cp{}_layer_{}_{}.npy'.format(cp, layer, 'bottom'))
+        t1_bot = np.load(EXP_DIR_CS / 't1_acc_cp{}_cp{}_layer_{}_{}_split_{}.npy'.format(args.check_min,
+         args.check_max, layer, 'bottom', args.split_per)) 
+        t5_bot = np.load(EXP_DIR_CS / 't5_acc_cp{}_cp{}_layer_{}_{}_split_{}.npy'.format(args.check_min,
+         args.check_max, layer, 'bottom', args.split_per)) 
 
-        X = range(0, cp+1)
+        X = range(0, args.check_max)
+
         # Plot accuracies for both class selective and random on the same figure 
         plt.xlabel('Checkpoints')
         plt.ylabel('Accuracy')
 
-        plt.plot(X, t1_top, label='T1 (Top)')
-        plt.plot(X, t5_top, label='T5 (Top)')
-        plt.plot(X, t1_bot, label='T1 (Bottom)')
-        plt.plot(X, t5_bot, label='T5 (Bottom)')
+        plt.plot(X, t1_top, label='T1 (Top ablated)')
+        plt.plot(X, t5_top, label='T5 (Top ablated)')
+        plt.plot(X, t1_bot, label='T1 (Bottom ablated)')
+        plt.plot(X, t5_bot, label='T5 (Bottom ablated)')
 
-        plt.title('Pop compare: Layer {}'.format(layer))
+        plt.title('Pop compare: Layer {} Split {}%'.format(layer, args.split_per*100))
         plt.legend()
-        plt.savefig(str(EXP_DIR_CS / '{}_cp{}_combined_layer_{}.png'.format(datetime.now().strftime('%m_%d_%Y-%H_%M_%S'), cp, layer)))
+        plt.savefig(str(SAVE_DIR / '{}_cp{}_cp{}_combined_pop_layer_{}.png'.format(datetime.now().strftime('%m_%d_%Y-%H_%M_%S'),  
+        args.check_min, args.check_max, layer)))
+        
         plt.clf()
 
 
@@ -92,10 +99,20 @@ if __name__ == '__main__':
     parser.add_argument("--exp_name_ran", type=str, required=True)
     parser.add_argument("--exp_name_cs", type=str, required=True)
     parser.add_argument("--vis", default="nor", type=str)
+    parser.add_argument("--check_min", required=True, type=int)
+    parser.add_argument("--check_max", required=True, type=int)
+    parser.add_argument("--save_dir", default=None, type=str)
+    parser.add_argument("--split_per", default=None, type=float)
     args = parser.parse_args()
 
     EXP_DIR_RAN = EXP_PATH / args.exp_name_ran
     EXP_DIR_CS = EXP_PATH / args.exp_name_cs 
+    if args.save_dir is not None: 
+        SAVE_DIR = EXP_PATH / args.save_dir 
+    else: 
+        SAVE_DIR = EXP_DIR_CS
+
+    os.makedirs(SAVE_DIR, exist_ok=True)
 
     # Max number of channels to ablate based on the layer number (this is based on the model structure)
     channels = {4: 256, 5: 512, 6: 1024, 7: 2048}
