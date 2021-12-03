@@ -68,7 +68,7 @@ for CUR_DIR, cur_type in [(EXP_DIR, 'cs'), (RAN_DIR, 'ran')]:
                 acc = (acc / np.max(acc)) * 100 
 
                 ax.set_xlabel('Channels ablated')
-                ax.set_ylabel('Accuracy')
+                ax.set_ylabel('Normalized Accuracy')
 
                 ax.plot(X, acc, label='CP {} Acc'.format(cp))
                 # plt.plot(X, t5_acc, label='Top 5 CP {} Acc'.format(cp))
