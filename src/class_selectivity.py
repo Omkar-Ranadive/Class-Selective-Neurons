@@ -12,12 +12,12 @@ from torchvision.models.resnet import Bottleneck as Bottleneck
 import utils 
 import time
 from tqdm import tqdm
+import copy 
 
 def forward(model, input_batch, target, class_activations):
     resnet_layers = nn.Sequential(*list(model.children()))
-
+    
     for index, layer in enumerate(resnet_layers):
-
         if isinstance(layer, torch.nn.modules.linear.Linear):
             # Flatten input batch once linear layer is reached 
             input_batch = torch.flatten(input_batch, start_dim=1)
@@ -37,9 +37,9 @@ def forward(model, input_batch, target, class_activations):
                             class_activations[index].update({target[i].item(): {}})  # ex: {layer_3: {class_0: {} } }
                         
                         if num in class_activations[index][target[i].item()]:
-                            class_activations[index][target[i].item()][num] += activation
+                            class_activations[index][target[i].item()][num] += activation.cpu()
                         else:
-                            class_activations[index][target[i].item()].update({num: activation})  # ex: {layer_3: {class_0: {bottleneck_0: activation} } }
+                            class_activations[index][target[i].item()].update({num: activation.cpu()})  # ex: {layer_3: {class_0: {bottleneck_0: activation} } }
 
                         # for k, v in class_activations.items():
                         #     print(k, ":", v)
@@ -143,6 +143,7 @@ def get_class_selectivity(model, val_loader):
         6: {},
         7: {}
     }
+    
     # Layer_k = outer layer num, layer_v = dict of the form {class_i: {} ... } 
     for layer_k, layer_v in class_activations.items():
         # for class_k, class_v in class_activations[layer_k].items():
@@ -165,49 +166,6 @@ def get_class_selectivity(model, val_loader):
             
             class_selectivity[layer_k].update({bottleneck_k: selectivity})
     
-    return class_selectivity
+    return class_selectivity, class_activations
 
 
-if __name__ == "__main__":
-    # model = models.resnet50(pretrained=True)
-    
-    # # train_dir = IMGNET_PATH / 'train'
-    # val_dir = IMGNET_PATH / 'val' 
-
-    # start_time = time.time() 
-    # # # Prepare validation loader
-    # val_loader = utils.load_imagenet_data(dir=val_dir, batch_size=256, num_workers=8)
-
-    # # # Prepare validation loader
-    # # # train_loader = utils.load_imagenet_data(dir=train_dir, batch_size=1, num_workers=8)
-
-
-    # cs_dict = get_class_selectivity(model=model, val_loader=val_loader) 
-    
-    # print("Took {} minutes: ".format((time.time() - start_time)/60))
-    
-    # utils.save_file(cs_dict, DATA_PATH / 'cs_dict_trial')
-
-    cs_dict_val = utils.load_file(DATA_PATH / 'cs_dict_val')
-    cs_dict_trial = utils.load_file(DATA_PATH / 'cs_dict_trial') 
-    cs_dict_val0 = utils.load_file(DATA_PATH / 'cs_dict_val_cp0')
-    # cs_train = utils.load_file(DATA_PATH / 'cs_dict_train')
-
-    # for layer in range(4, 8): 
-    #     print("For layer {}".format(layer))
-    #     for k, v in cs_dict_val[layer].items(): 
-    #         val2 = cs_dict_trial[layer][k] 
-    #         similar_sum = torch.sum(torch.isclose(v, val2, rtol=1e-3))
-    #         print(similar_sum, v.shape[0])
-    #         print(int(similar_sum.item()) == int(v.shape[0]))
-
-    for layer in range(4, 8): 
-        print("For layer {}".format(layer))
-        for k, v in cs_dict_val[layer].items(): 
-            val2 = cs_dict_val0[layer][k] 
-            # similar_sum = torch.sum(torch.isclose(v, val2, rtol=1e-3))
-            # print(similar_sum, v.shape[0])
-            # print(int(similar_sum.item()) == int(v.shape[0]))
-            print(v.shape, val2.shape)
-
-        

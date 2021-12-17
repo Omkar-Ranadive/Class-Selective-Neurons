@@ -89,8 +89,9 @@ for cp in checkpoints_to_load:
     # val_loader = utils.load_imagenet_data(dir=val_dir, batch_size=1, num_workers=8)
     cs_dict_path = DATA_PATH / 'cs_dict_{}_cp{}'.format(args.loader, cp)
     if not cs_dict_path.is_file(): 
-        class_selectivity = get_class_selectivity(model=model, val_loader=loader_cp) 
+        class_selectivity, class_activations = get_class_selectivity(model=model, val_loader=loader_cp) 
         utils.save_file(class_selectivity, DATA_PATH / 'cs_dict_{}_cp{}'.format(args.loader, cp))
+        utils.save_file(class_activations, DATA_PATH / 'cs_dict_{}_cp{}_full'.format(args.loader, cp))
     else: 
         class_selectivity = utils.load_file(cs_dict_path)
 
