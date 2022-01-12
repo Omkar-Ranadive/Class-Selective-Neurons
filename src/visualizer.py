@@ -4,7 +4,7 @@ from constants import EXP_PATH, DATA_PATH
 from datetime import datetime
 import argparse 
 import os 
-
+import re 
 
 def normal_vis(): 
     for layer in range(4, 8): 
@@ -92,6 +92,31 @@ def pop_vis():
         
         plt.clf()
 
+def cpb_vis(): 
+    for f in sorted(os.listdir(EXP_DIR_CS)):  
+        matches = ['.npy', 'b', 't1']
+        if all(x in f for x in matches) and re.search('e[{}-{}]'.format(args.check_min, args.check_max), f):
+            t1_ran = np.load(EXP_DIR_RAN / f)
+            t5_ran = np.load(EXP_DIR_RAN / f.replace('t1', 't5'))
+
+            t1_cs = np.load(EXP_DIR_CS / f)
+            t5_cs = np.load(EXP_DIR_CS / f.replace('t1', 't5'))
+
+            X = list(range(0, channels[int(f[-5])]+1, 10)) # Stepping the channels to speed it up, note f[-5] gives the layer num
+
+            # Plot accuracies for both class selective and random on the same figure 
+            plt.xlabel('Channels ablated')
+            plt.ylabel('Accuracy')
+
+            plt.plot(X, t1_ran, label='Top 1 Acc Ran')
+            plt.plot(X, t5_ran, label='Top 5 Acc Ran')
+            plt.plot(X, t1_cs, label='Top 1 Acc CS')
+            plt.plot(X, t5_cs, label='Top 5 Acc CS')
+
+            plt.title('{}'.format(f[:-4]))
+            plt.legend()
+            plt.savefig(str(SAVE_DIR / '{}_combined_{}.png'.format(datetime.now().strftime('%m_%d_%Y-%H_%M_%S'), f[:-4])))
+            plt.clf()
 
 
 if __name__ == '__main__': 
@@ -124,3 +149,5 @@ if __name__ == '__main__':
         cp_vis() 
     elif args.vis == 'pop':
         pop_vis()
+    elif args.vis == 'cpb': 
+        cpb_vis() 
