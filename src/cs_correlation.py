@@ -65,6 +65,7 @@ for cp in range(args.check_min, args.check_max+1):
                     all_activations_for_this_bottleneck = class_activations[layer_k][class_k][bottleneck_k]
             
             all_activations_for_this_bottleneck = all_activations_for_this_bottleneck.t()
+            print(all_activations_for_this_bottleneck.shape)
             avg_activations_for_bn = torch.mean(all_activations_for_this_bottleneck, dim=0) 
             
             act_vals[layer_k].append(avg_activations_for_bn.numpy())
