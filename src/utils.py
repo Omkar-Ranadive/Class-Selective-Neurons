@@ -116,3 +116,16 @@ def load_file(filename):
         file = pickle.load(f)
 
     return file
+
+
+def load_checkpoint_module(CHECK_DIR, model_dict):
+    """
+    If checkpoints are saved with "module." in their key names, then replace the keys to load it successfully 
+    """
+    checkpoint = torch.load(CHECK_DIR)
+    for key in checkpoint['state_dict'].keys(): 
+        model_key = key.replace("module.", "")
+        model_dict[model_key] = checkpoint['state_dict'][key] 
+
+    return model_dict
+

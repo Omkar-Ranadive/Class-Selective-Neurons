@@ -80,9 +80,11 @@ parser.add_argument('--multiprocessing-distributed', action='store_true',
                          'N processes per node, which has N GPUs. This is the '
                          'fastest way to use PyTorch for either single node or '
                          'multi node data parallel training')
-parser.add_argument("--exp_name", required=True, type=str)
-parser.add_argument("--inner_save", default=None, type=int, 
+parser.add_argument('--exp_name', required=True, type=str)
+parser.add_argument('--inner_save', default=None, type=int, 
                     help="Save within checkpoints")
+parser.add_argument('--save_batch_targets', action='store_true', help='Save batch target labels for each epoch')
+
 
 best_acc1 = 0
 
@@ -282,6 +284,7 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
     top1 = AverageMeter('Acc@1', ':6.2f')
     top5 = AverageMeter('Acc@5', ':6.2f')
     num_batches = len(train_loader) 
+    batch_targets = []
 
     if args.inner_save: 
         # Calculate the batch after which to save 
@@ -337,6 +340,12 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
             'best_acc1': best_acc1,
             'optimizer' : optimizer.state_dict(),
             }, False, filename='checkpoint_e{}_b{}.pth.tar'.format(epoch, i))
+        
+        if args.save_batch_targets: 
+            batch_targets.append(target.cpu())
+    
+    if args.save_batch_targets: 
+        torch.save(batch_targets, EXP_DIR / 'bt_e{}.pt'.format(epoch))
         
 
 def validate(val_loader, model, criterion, args):

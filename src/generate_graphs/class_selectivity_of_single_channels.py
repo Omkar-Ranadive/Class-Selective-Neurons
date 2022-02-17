@@ -15,17 +15,22 @@ import utils
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--exp_name", type=str, required=True)
+parser.add_argument("--data_dir", type=str, default=None)
 parser.add_argument("--loader", default='val', type=str)
 parser.add_argument("--check_min", required=True, type=int)
 parser.add_argument("--check_max", required=True, type=int)
-parser.add_argument("--plot", default='true', type=str)
+parser.add_argument("--plot", action='store_true')
 args = parser.parse_args()
 
 
-args.plot = True if args.plot == 'true' else False 
-
 EXP_DIR = EXP_PATH / args.exp_name 
 os.makedirs(EXP_DIR, exist_ok=True)
+
+
+if args.data_dir is not None: 
+    DATA_DIR = DATA_PATH / args.data_dir
+else:
+    DATA_DIR = DATA_PATH
 
 channels = {4: 256, 5: 512, 6: 1024, 7: 2048}
 
@@ -34,7 +39,7 @@ checkpoints_to_load = [i for i in range(args.check_min, args.check_max)]
 cs_for_every_cp = []
 
 for cp in checkpoints_to_load:
-    cs_dict_path = DATA_PATH / 'cs_dict_{}_cp{}'.format(args.loader, cp)
+    cs_dict_path = DATA_DIR / 'cs_dict_{}_cp{}'.format(args.loader, cp)
     class_selectivity = utils.load_file(cs_dict_path)
     cs_for_every_cp.append(class_selectivity)
 

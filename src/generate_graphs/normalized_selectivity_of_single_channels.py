@@ -15,6 +15,7 @@ import seaborn as sns
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--exp_name", type=str, required=True)
+parser.add_argument("--data_dir", type=str, default=None)
 parser.add_argument("--num_workers", default=8, type=int)
 parser.add_argument("--batch_size", default=512, type=int)
 parser.add_argument("--loader", default='val', type=str)
@@ -32,10 +33,12 @@ os.makedirs(EXP_DIR, exist_ok=True)
 
 if args.save_dir is not None: 
     SAVE_DIR = EXP_PATH / args.save_dir 
+    os.makedirs(SAVE_DIR, exist_ok=True)
 
-
-os.makedirs(SAVE_DIR, exist_ok=True)
-
+if args.data_dir is not None: 
+    DATA_DIR = DATA_PATH / args.data_dir
+else:
+    DATA_DIR = DATA_PATH
 
 channels = {4: 256, 5: 512, 6: 1024, 7: 2048}
 
@@ -48,7 +51,7 @@ fig2, ax2 = plt.subplots()
 
 
 for cp in checkpoints_to_load:
-    cs_dict_path = DATA_PATH / 'cs_dict_{}_cp{}'.format(args.loader, cp)
+    cs_dict_path = DATA_DIR / 'cs_dict_{}_cp{}'.format(args.loader, cp)
     class_selectivity = utils.load_file(cs_dict_path)
     cs_for_every_cp.append(class_selectivity)
 
