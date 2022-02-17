@@ -118,26 +118,49 @@ def cpb_vis():
             plt.savefig(str(SAVE_DIR / '{}_combined_{}.png'.format(datetime.now().strftime('%m_%d_%Y-%H_%M_%S'), f[:-4])))
             plt.clf()
 
+def combine_plots_from_dirs(dirs, rows=2, cols=2): 
+    fig = plt.figure(figsize=(10, 7))
+    imgs = []
+    for dir in dirs: 
+        EXP_DIR = EXP_PATH / dir 
+        temp = []
+        for f in sorted(os.listdir(EXP_DIR)): 
+            img = plt.imread(EXP_DIR / f) 
+            temp.append((img, f[:-4])) 
+        
+        imgs.append(temp)
+
+    for i in range(len(imgs[0])): 
+        for j, dir_name in enumerate(dirs): 
+            fig.add_subplot(rows, cols, j+1)
+            plt.imshow(imgs[j][i][0])
+            plt.axis('off')
+            plt.title(dir_name, fontdict = {'fontsize' : 6})
+
+        fig.savefig(SAVE_DIR / '{}.png'.format(imgs[j][i][1]), dpi=300, bbox_inches = 'tight', pad_inches = 0.1)
+        fig.clear()
+
 
 if __name__ == '__main__': 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--exp_name_ran", type=str, required=True)
-    parser.add_argument("--exp_name_cs", type=str, required=True)
+    parser.add_argument("--exp_name_ran", default="dummy_ran", type=str)
+    parser.add_argument("--exp_name_cs", default="dummy_cs", type=str)
     parser.add_argument("--vis", default="nor", type=str)
-    parser.add_argument("--check_min", required=True, type=int)
-    parser.add_argument("--check_max", required=True, type=int)
+    parser.add_argument("--check_min", type=int)
+    parser.add_argument("--check_max", type=int)
     parser.add_argument("--save_dir", default=None, type=str)
     parser.add_argument("--split_per", default=None, type=float)
+    parser.add_argument('-l','--list', nargs='+')
     args = parser.parse_args()
 
     EXP_DIR_RAN = EXP_PATH / args.exp_name_ran
     EXP_DIR_CS = EXP_PATH / args.exp_name_cs 
     if args.save_dir is not None: 
         SAVE_DIR = EXP_PATH / args.save_dir 
+        os.makedirs(SAVE_DIR, exist_ok=True)
     else: 
         SAVE_DIR = EXP_DIR_CS
 
-    os.makedirs(SAVE_DIR, exist_ok=True)
 
     # Max number of channels to ablate based on the layer number (this is based on the model structure)
     channels = {4: 256, 5: 512, 6: 1024, 7: 2048}
@@ -151,3 +174,5 @@ if __name__ == '__main__':
         pop_vis()
     elif args.vis == 'cpb': 
         cpb_vis() 
+    elif args.vis == 'combd':
+        combine_plots_from_dirs(dirs=args.list)
