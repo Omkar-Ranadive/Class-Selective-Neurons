@@ -5,6 +5,7 @@ from datetime import datetime
 import argparse 
 import os 
 import re 
+import torch
 
 def normal_vis(): 
     for layer in range(4, 8): 
@@ -141,6 +142,25 @@ def combine_plots_from_dirs(dirs, rows=2, cols=2):
         fig.clear()
 
 
+def compare_cp_acc(dirs):
+
+    for dir in dirs: 
+        DATA_DIR = DATA_PATH / dir 
+        accs = []
+        for cp in sorted(os.listdir(DATA_DIR)): 
+            if '.tar' in cp: 
+                cur_cp = torch.load(DATA_DIR / cp)
+                accs.append(cur_cp['best_acc1'].item())
+        
+        plt.plot(range(0, len(accs)), accs, label='{}'.format(dir))
+    
+    plt.xlabel('Checkpoints')
+    plt.ylabel('Accuracy')
+    plt.legend()
+    plt.savefig(SAVE_DIR / 'cp_acc_com.png')
+ 
+
+
 if __name__ == '__main__': 
     parser = argparse.ArgumentParser()
     parser.add_argument("--exp_name_ran", default="dummy_ran", type=str)
@@ -176,3 +196,5 @@ if __name__ == '__main__':
         cpb_vis() 
     elif args.vis == 'combd':
         combine_plots_from_dirs(dirs=args.list)
+    elif args.vis == 'compcp':
+        compare_cp_acc(dirs=args.list)
