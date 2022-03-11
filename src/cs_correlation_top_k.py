@@ -140,7 +140,8 @@ def get_class_activations(model, val_loader):
 # for cp in range(args.check_num, args.check_num+1):
 
 corr_dict = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
-checkpoints = [1, 45, 89]
+checkpoints = range(1, 90, 4)  # Step by 4 
+
 for cp in checkpoints:
     logger.info("-"*20)
     logger.info("Checkpoint {}".format(cp))
