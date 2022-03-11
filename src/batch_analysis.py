@@ -145,7 +145,7 @@ if __name__ == '__main__':
     with open(DATA_PATH / "imagenet_classes.txt", "r") as f:
         categories = [s.strip() for s in f.readlines()]
 
-    class_dict = utils.load_file(EXP_DIR / 'cs_dict_cp1_full')
+    # class_dict = utils.load_file(EXP_DIR / 'cs_dict_cp1_full')
     print("1. Calculate class selectivity for each checkpoint") 
     print("2. Get top classes")
     print("3. Get batch dist")

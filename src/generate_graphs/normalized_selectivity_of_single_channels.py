@@ -76,25 +76,27 @@ for l, c in channels.items():
             CHANNEL_PATH = BOTTLENECK_LAYER_PATH / "channel_{}".format(i)
             os.makedirs(CHANNEL_PATH, exist_ok=True)
 
-
             cs_for_channel = np.load(CHANNEL_PATH / 'layer{}_bottleneck{}_channel{}_cp{}_to_cp{}.npy'.format(l, b, i, args.check_min, args.check_max))
-            
-            cs_for_channel_norm = (cs_for_channel - np.min(cs_for_channel)) / (np.max(cs_for_channel) - np.min(cs_for_channel))            
 
+            if (np.max(cs_for_channel) - np.min(cs_for_channel)) != 0: 
+                cs_for_channel_norm = (cs_for_channel - np.min(cs_for_channel)) / (np.max(cs_for_channel) - np.min(cs_for_channel))
+            else:
+                cs_for_channel_norm = cs_for_channel
 
+      
             # # Plot the un-normalized version first 
-
             ax1.set_xlabel('Checkpoints')
             ax1.set_ylabel('Class Selectivity Index')
             ax1.plot(checkpoints_to_load, cs_for_channel, label='CS for Channel {}'.format(i))
             ax1.set_title('Layer {} -- Bottleneck {}  -- Class Selectivity per Checkpoint'.format(l, b))
 
+          
             # Plot the normalized version 
             ax2.set_xlabel('Checkpoints')
             ax2.set_ylabel('Class Selectivity Index')
             ax2.plot(checkpoints_to_load, cs_for_channel_norm, label='CS for Channel {}'.format(i))
             ax2.set_title('Layer {} -- Bottleneck {}  -- Class Selectivity per Checkpoint'.format(l, b))
-
+        
         if args.save_dir is None: 
             SAVE_DIR = BOTTLENECK_LAYER_PATH 
         fig1.savefig(SAVE_DIR / '{}_l_{}_bn{}_cp{}_to_cp{}.png'.format(datetime.now().strftime('%m_%d_%Y-%H_%M_%S'), l, b, args.check_min, args.check_max))

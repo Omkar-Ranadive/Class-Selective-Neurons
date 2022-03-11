@@ -8,6 +8,7 @@ import random
 import shutil
 import time
 import warnings
+import logging 
 from enum import Enum
 
 import torch
@@ -84,7 +85,7 @@ parser.add_argument('--exp_name', required=True, type=str)
 parser.add_argument('--inner_save', default=None, type=int, 
                     help="Save within checkpoints")
 parser.add_argument('--save_batch_targets', action='store_true', help='Save batch target labels for each epoch')
-
+parser.add_argument("--use_ws", action='store_true', help='If true, weighted sampler is used')
 
 best_acc1 = 0
 
@@ -92,8 +93,17 @@ def main():
     args = parser.parse_args()
 
     global EXP_DIR
+    global logger 
     EXP_DIR = DATA_PATH / args.exp_name 
     os.makedirs(EXP_DIR, exist_ok=True)
+
+    logging.basicConfig(level=logging.INFO, filename=str(EXP_DIR / 'info.log'), format='%(message)s', filemode='w')
+    logger = logging.getLogger()
+
+    logger.info(f'Batch size: {args.batch_size}')
+    logger.info(f'Training epochs: {args.epochs}')
+    logger.info(f'Learning Rate: {args.lr}')
+    logger.info(f'Model architecture: {args.arch}')
 
     if args.seed is not None:
         random.seed(args.seed)
@@ -230,6 +240,24 @@ def main_worker(gpu, ngpus_per_node, args):
 
     if args.distributed:
         train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
+    elif args.use_ws: 
+        weight_cycle = list(map(float, input("Enter weights: ").split()))
+        cycle_switch = int(input("Enter num of examples after which weight gets cycled: "))
+        cycle_counter = -1 
+        weights = []
+
+        logger.info('Using weighted sampler')
+        logger.info(f'Weights used: {weight_cycle}')
+        logger.info(f'Cycle switch used: {cycle_switch}')
+
+        for i in range(len(train_dataset)): 
+            if i % cycle_switch == 0 and cycle_counter < len(weight_cycle)-1: 
+                cycle_counter += 1 
+            
+            weights.append(weight_cycle[cycle_counter])
+
+        train_sampler = torch.utils.data.WeightedRandomSampler(weights=weights, num_samples=len(train_dataset), replacement=False)
+
     else:
         train_sampler = None
 
