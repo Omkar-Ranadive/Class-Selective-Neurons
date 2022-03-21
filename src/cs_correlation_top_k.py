@@ -255,6 +255,8 @@ sns.set_theme()
 # Plot change of mean correlation across all classes
 for k, v in corr_dict.items():
     SAVE_DIR = EXP_DIR / 'k.{}'.format(k)
+    SAVE_DIR.mkdir(parents=True, exist_ok=True)
+
     for (li, lj), class_dict, in v.items():
         fig1, ax1 = plt.subplots()
         ax1.set_prop_cycle('color', colors)
@@ -285,6 +287,9 @@ for k, v in corr_dict.items():
             stds.append(np.std(means))
 
         final_means, stds = np.array(final_means), np.array(stds)
+        se = stds / np.sqrt(num_classes)
+        confidence_intervals = 2 * se 
+
         plt.plot(checkpoints, final_means, 'b-', label='Mean of all classes')
         plt.fill_between(checkpoints, final_means - stds, final_means + stds, color='b', alpha=0.2)
         plt.xlabel('Checkpoints')
@@ -292,5 +297,15 @@ for k, v in corr_dict.items():
         plt.legend()
         plt.savefig(EXP_DIR / f'Error_K{k}_Layer_{li}_{lj}.jpg')
         plt.clf()
+
+        plt.plot(checkpoints, final_means, 'b-', label='Mean of all classes')
+        plt.fill_between(checkpoints, final_means - confidence_intervals, final_means + confidence_intervals, color='b', alpha=0.2)
+        plt.xlabel('Checkpoints')
+        plt.ylabel('Mean Correlation')
+        plt.legend()
+        plt.savefig(EXP_DIR / f'Confidence_Interval_K{k}_Layer_{li}_{lj}.jpg')
+        plt.clf()
+
+
 
     
