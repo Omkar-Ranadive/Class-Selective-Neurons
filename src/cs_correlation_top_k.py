@@ -262,7 +262,7 @@ for k, v in corr_dict.items():
         ax1.set_prop_cycle('color', colors)
         ax1.set_xlabel('Checkpoints')
         ax1.set_ylabel('Mean correlation')
-        ax1.set_title('Layer {} - {}'.format(li, lj))
+        ax1.set_title(f'Layer {li}-{lj} k{k}')
 
         for class_k, means in class_dict.items(): 
             ax1.plot(checkpoints, means, label='Class {}'.format(class_k))
@@ -294,6 +294,7 @@ for k, v in corr_dict.items():
         plt.fill_between(checkpoints, final_means - stds, final_means + stds, color='b', alpha=0.2)
         plt.xlabel('Checkpoints')
         plt.ylabel('Mean Correlation')
+        plt.title(f'Layer {li}-{lj} k{k}')
         plt.legend()
         plt.savefig(EXP_DIR / f'Error_K{k}_Layer_{li}_{lj}.jpg')
         plt.clf()
@@ -302,6 +303,7 @@ for k, v in corr_dict.items():
         plt.fill_between(checkpoints, final_means - confidence_intervals, final_means + confidence_intervals, color='b', alpha=0.2)
         plt.xlabel('Checkpoints')
         plt.ylabel('Mean Correlation')
+        plt.title(f'Layer {li}-{lj} k{k}')
         plt.legend()
         plt.savefig(EXP_DIR / f'Confidence_Interval_K{k}_Layer_{li}_{lj}.jpg')
         plt.clf()
