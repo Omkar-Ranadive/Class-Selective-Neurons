@@ -100,6 +100,25 @@ def forward(model, input_batch, target, class_activations):
 
         else:
             input_batch = layer(input_batch)
+            
+            # For final layer 9 (linear output)
+            if isinstance(layer, torch.nn.modules.linear.Linear):
+                activations = input_batch.detach().clone()
+                num = 0  # For layer 9 aka the Linear layer, there is no bottleneck layer. For simplicity, use bottleneck num as 0 
+
+                for i, activation in enumerate(activations): 
+                    activation = torch.unsqueeze(activation, dim=0)
+
+                    if target[i].item() not in class_activations[index]:
+                        class_activations[index].update({target[i].item(): {}})  # ex: {layer_3: {class_0: {} } }
+                    
+                    if num in class_activations[index][target[i].item()]:
+                        # class_activations[index][target[i].item()][num] += activation.cpu()
+                        class_activations[index][target[i].item()][num] = torch.cat((class_activations[index][target[i].item()][num], activation.cpu()), dim=0)
+                    else:
+                        class_activations[index][target[i].item()].update({num: activation.cpu()})  # ex: {layer_3: {class_0: {bottleneck_0: activation} } }
+
+
 
     return input_batch
 
@@ -121,7 +140,8 @@ def get_class_activations(model, val_loader):
         4: {},
         5: {},
         6: {},
-        7: {}
+        7: {}, 
+        9: {}
     }
     counter = 0
     class_counter = defaultdict(int)
@@ -142,6 +162,7 @@ def get_class_activations(model, val_loader):
 # for cp in range(args.check_num, args.check_num+1):
 
 checkpoints = range(1, 90, 4)  # Step by 4 
+# checkpoints = [1, 45, 89]
 
 if not args.cd: 
     corr_dict = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
@@ -269,6 +290,7 @@ for k, v in corr_dict.items():
         
         fig1.savefig(SAVE_DIR / 'Layer_{}_{}_Mean_Corr.png'.format(li, lj))
         ax1.clear()
+        plt.close(fig1)
 
 #  Error plot 
 plt.clf()
