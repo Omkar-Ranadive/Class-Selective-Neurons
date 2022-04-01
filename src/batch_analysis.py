@@ -85,6 +85,10 @@ def get_top_classes(k=200):
 
             for layer, counts in class_counter.items(): 
                     plt.bar(counts.keys(), counts.values(), edgecolor='#43A6C6')
+                    cp_num = re.search('cp\d+', f).group()
+                    plt.title(f'{cp_num} layer {layer} top {k} classes')
+                    plt.xlabel('Class Index')
+                    plt.ylabel('Count of occurence')
                     plt.savefig(SAVE_DIR / f'top_{k}_layer_{layer}_{f}.jpg')
                     plt.clf()
                     plt.close()
@@ -110,6 +114,10 @@ def gen_batch_dist(thres=0.3):
 
             cdict = Counter(classes)
             plt.bar(cdict.keys(), cdict.values(), edgecolor='#43A6C6')
+
+            plt.title(f'Batch Num {f[:-3]} Thres: {thres}')
+            plt.xlabel('Class Index')
+            plt.ylabel('Count of Samples')
 
             plt.savefig(SAVE_DIR / f'batch_dist_{f[:-3]}_t{thres}.jpg')
             plt.clf()
