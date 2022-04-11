@@ -6,4 +6,4 @@ IMGNET_PATH = Path('/data/ImageNet/')
 EXP_PATH = PARENT_PATH / '../experiments' 
 
 
-
+IMGNET_CLASSES = 1000 

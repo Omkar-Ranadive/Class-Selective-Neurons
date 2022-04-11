@@ -1,4 +1,4 @@
-from constants import DATA_PATH, EXP_PATH, IMGNET_PATH
+from constants import DATA_PATH, EXP_PATH, IMGNET_PATH, IMGNET_CLASSES
 from class_selectivity import bottleneck_layer
 import utils
 
@@ -31,6 +31,7 @@ parser.add_argument("--k", default=3, type=int)
 parser.add_argument("--num_workers", default=8, type=int)
 parser.add_argument("--plot_mat", action='store_true')
 parser.add_argument("--cd", default=None, type=str, help="Can provide the correlation dictionary directly if available")
+parser.add_argument("--ran", action='store_true', help="If true, select random k neurons instead of top k class selective ones")
 args = parser.parse_args()
 
 
@@ -162,6 +163,7 @@ def get_class_activations(model, val_loader):
 # for cp in range(args.check_num, args.check_num+1):
 
 checkpoints = range(1, 90, 4)  # Step by 4 
+checkpoints = [0] + list(checkpoints)
 # checkpoints = [1, 45, 89]
 
 if not args.cd: 
@@ -197,10 +199,14 @@ if not args.cd:
             for class_k, class_v in class_activations[layer_k].items():
                 for bottleneck_k, bottleneck_v in class_activations[layer_k][class_k].items():
                     for k in range(1, args.k+1):
-                        top_k_activations_for_this_bottleneck, _ = torch.topk(class_activations[layer_k][class_k][bottleneck_k], k=k)
-                        act_vals[k][class_k][layer_k].append(torch.mean(top_k_activations_for_this_bottleneck, dim=1).numpy())
-    
-        
+                        if not args.ran: 
+                            k_activations_for_this_bottleneck, _ = torch.topk(class_activations[layer_k][class_k][bottleneck_k], k=k)
+                        else: 
+                            indices = np.random.randint(low=0, high=class_activations[layer_k][class_k][bottleneck_k].shape[1], size=k)
+                            k_activations_for_this_bottleneck = class_activations[layer_k][class_k][bottleneck_k][:, indices]
+
+                        act_vals[k][class_k][layer_k].append(torch.mean(k_activations_for_this_bottleneck, dim=1).numpy())
+
         print("Activation values calculated...")
         print("Time taken: {}".format(time.time() - start))
 
@@ -249,10 +255,12 @@ if not args.cd:
 
                     # Plot for the sliced frame 
                     df_corr = df_sliced.corr()
+
                     # Take mean of abs correlation values between layer i and layer j 
                     corr_mat = np.abs(df_corr.loc[cols_i, cols_j].to_numpy())
                     # Save it in corr dict. Format:  Layer tuple -> Class Num -> list of mean values for each checkpoint 
-                    corr_dict[k][(li, lj)][class_k].append(np.mean(corr_mat))
+                    # Take nan mean as if std = 0, then corr for that pair will be Nan 
+                    corr_dict[k][(li, lj)][class_k].append(np.nanmean(corr_mat))
                     if args.plot_mat:
                         hm_sliced = sns.heatmap(df_corr, annot=True)
                         hm_sliced.set(title="CP {} Layers {} - {} for {}".format(cp, li, lj, categories[class_k]))
