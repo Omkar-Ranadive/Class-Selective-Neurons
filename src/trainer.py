@@ -296,6 +296,20 @@ def main_worker(gpu, ngpus_per_node, args):
         validate(val_loader, model, criterion, args)
         return
 
+
+    # Save initialized weights 
+    acc1, acc5 = validate(val_loader, model, criterion, args)
+    save_checkpoint({
+        'epoch': 0,
+        'arch': args.arch,
+        'state_dict': model.state_dict(),
+        'best_acc1': acc1,
+        'best_acc5': acc5, 
+        'train_acc1': train_acc1,
+        'train_acc5': train_acc5,
+        'optimizer' : optimizer.state_dict(),
+    }, False, filename='checkpoint_e{}.pth.tar'.format(0))
+
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
             train_sampler.set_epoch(epoch)
@@ -325,7 +339,7 @@ def main_worker(gpu, ngpus_per_node, args):
                 'train_acc1': train_acc1,
                 'train_acc5': train_acc5,
                 'optimizer' : optimizer.state_dict(),
-            }, is_best, filename='checkpoint_e{}.pth.tar'.format(epoch))
+            }, is_best, filename='checkpoint_e{}.pth.tar'.format(epoch+1))
 
 
 def train(train_loader, model, criterion, optimizer, epoch, args):
