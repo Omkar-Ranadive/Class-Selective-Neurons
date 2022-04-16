@@ -94,7 +94,7 @@ for l, c in channels.items():
         se = stds / np.sqrt(c)
         confidence_intervals = 2 * se        
      
-        ax1.plot(checkpoints_to_load, cs_for_channel, label=f'Bottleneck Layer {b}')
+        ax1.plot(checkpoints_to_load, means, label=f'Bottleneck Layer {b}')
         ax1.fill_between(checkpoints_to_load, means - confidence_intervals, means + confidence_intervals,  alpha=0.3)
         ax1.legend()
           
@@ -104,7 +104,7 @@ for l, c in channels.items():
     se = stds / np.sqrt(module_level_means.shape[0])
     confidence_intervals = 2 * se    
 
-    ax2.plot(checkpoints_to_load, cs_for_channel, label=f'Module {l}')
+    ax2.plot(checkpoints_to_load, means, label=f'Module {l}')
     ax2.fill_between(checkpoints_to_load, means - confidence_intervals, means + confidence_intervals,  alpha=0.3)
     ax2.legend(loc='upper right')
           
