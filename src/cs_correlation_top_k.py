@@ -26,6 +26,7 @@ parser.add_argument("--exp_name", type=str, required=True)
 # parser.add_argument("--check_num", required=True, type=int)
 # parser.add_argument("--check_min", required=True, type=int)
 # parser.add_argument("--check_max", required=True, type=int)
+parser.add_argument("--data_dir", type=str, required=True)
 parser.add_argument("--batch_size", default=512, type=int)
 parser.add_argument("--k", default=3, type=int)
 parser.add_argument("--num_workers", default=8, type=int)
@@ -37,6 +38,8 @@ args = parser.parse_args()
 
 EXP_DIR = EXP_PATH / args.exp_name
 os.makedirs(EXP_DIR, exist_ok=True)
+
+data_dir = DATA_PATH / args.data_dir
 
 # Setup logger 
 logging.basicConfig(level=logging.INFO, filename=str(EXP_DIR / 'info.log'), format='%(message)s', filemode='w')
@@ -173,7 +176,9 @@ if not args.cd:
         logger.info("-"*20)
         logger.info("Checkpoint {}".format(cp))
         # class_activations = utils.load_file(DATA_PATH / 'cs_dict_val_cp{}_full'.format(cp))
-        checkpoint = torch.load(DATA_PATH / 'model_checkpoints' / 'CHECKPOINTS' / 'EXPE1' / 'checkpoint_epoch{}.pth.tar'.format(cp))
+        # checkpoint = torch.load(DATA_PATH / 'model_checkpoints' / 'CHECKPOINTS' / 'EXPE1' / 'checkpoint_epoch{}.pth.tar'.format(cp))
+        checkpoint = torch.load(data_dir / f'checkpoint_e{cp}.pth.tar')
+
         # Layer -> Class -> Bottleneck
 
         val_dir = IMGNET_PATH / 'val'

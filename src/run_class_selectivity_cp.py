@@ -16,23 +16,27 @@ import numpy as np
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--exp_name", type=str, required=True)
+parser.add_argument("--data_dir", type=str, required=True)
 parser.add_argument("--num_workers", default=8, type=int)
 parser.add_argument("--batch_size", default=512, type=int)
 parser.add_argument("--loader", default='val', type=str)
-parser.add_argument("--check_min", required=True, type=int)
-parser.add_argument("--check_max", required=True, type=int)
+parser.add_argument("--check_min", default=None, type=int)
+parser.add_argument("--check_max", default=None, type=int)
 args = parser.parse_args()
 
 
 """
 Checkpoint structure: 
-save_checkpoint({
-                ‘epoch’: epoch + 1,
-                ‘arch’: args.arch,
-                ‘state_dict’: model.state_dict(),
-                ‘best_acc1’: best_acc1,
-                ‘optimizer’ : optimizer.state_dict(),
-            }, is_best)
+      save_checkpoint({
+                'epoch': epoch + 1,
+                'arch': args.arch,
+                'state_dict': model.state_dict(),
+                'best_acc1': best_acc1,
+                'best_acc5': best_acc5, 
+                'train_acc1': train_acc1,
+                'train_acc5': train_acc5,
+                'optimizer' : optimizer.state_dict(),
+            }, is_best, filename='checkpoint_e{}.pth.tar'.format(epoch+1))
 """
 
 
@@ -41,6 +45,8 @@ save_checkpoint({
 EXP_DIR = EXP_PATH / args.exp_name 
 if not os.path.isdir(EXP_DIR): 
     os.mkdir(EXP_DIR) 
+
+DATA_DIR = DATA_PATH / args.data_dir
 
 # Setup logger 
 logging.basicConfig(level=logging.INFO, filename=str(EXP_DIR / 'info.log'), format='%(asctime)s %(message)s')
@@ -62,7 +68,15 @@ loader =  utils.load_imagenet_data(dir=dir, batch_size=args.batch_size, num_work
 # Max number of channels to ablate based on the layer number (this is based on the model structure)
 channels = {4: 256, 5: 512, 6: 1024, 7: 2048}
 
-checkpoints_to_load = [i for i in range(args.check_min, args.check_max)]
+if args.check_min and args.check_max:
+    checkpoints_to_load = [i for i in range(args.check_min, args.check_max+1)]
+else: 
+    # Load all of the first 15 checkpoints as selectivity is more prominent in the earlier epochs 
+    checkpoints_to_load = [i for i in range(0, 16)]
+    # Then load remaining checkpoints with step of 5 
+    checkpoints_to_load.extend(list(range(16, 91, 5)))
+    
+
 
 # Load pre-trained Resnet 
 model = models.resnet50()
@@ -122,3 +136,5 @@ for cp in checkpoints_to_load:
         # Save data for future use 
         np.save(EXP_DIR / 't1_acc_cp{}_layer_{}'.format(cp, layer), t1_acc) 
         np.save(EXP_DIR / 't5_acc_cp{}_layer_{}'.format(cp, layer), t5_acc) 
+
+    

@@ -6,6 +6,12 @@ import argparse
 import os 
 import re 
 import torch
+import natsort 
+import seaborn as sns 
+
+
+sns.set_theme()
+
 
 def normal_vis(): 
     for layer in range(4, 8): 
@@ -147,7 +153,9 @@ def compare_cp_acc(dirs):
     for dir in dirs: 
         DATA_DIR = DATA_PATH / dir 
         accs = []
-        for cp in sorted(os.listdir(DATA_DIR)): 
+        files = natsort.natsorted(os.listdir(DATA_DIR))
+
+        for cp in files: 
             if '.tar' in cp: 
                 cur_cp = torch.load(DATA_DIR / cp)
                 accs.append(cur_cp['best_acc1'].item())
@@ -185,7 +193,6 @@ if __name__ == '__main__':
     # Max number of channels to ablate based on the layer number (this is based on the model structure)
     channels = {4: 256, 5: 512, 6: 1024, 7: 2048}
 
-    
     if args.vis == 'nor': 
         normal_vis() 
     elif args.vis == 'cp': 

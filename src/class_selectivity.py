@@ -13,6 +13,8 @@ import utils
 import time
 from tqdm import tqdm
 import copy 
+import argparse
+
 
 def forward(model, input_batch, target, class_activations):
     resnet_layers = nn.Sequential(*list(model.children()))
@@ -167,5 +169,57 @@ def get_class_selectivity(model, val_loader):
             class_selectivity[layer_k].update({bottleneck_k: selectivity})
     
     return class_selectivity, class_activations
+
+
+def calculate_selectivity(data_dir, loader, check_min, check_max): 
+
+    dir = IMGNET_PATH / loader
+
+    # Load pre-trained Resnet 
+    model = models.resnet50()
+    model_dict = model.state_dict() 
+
+    loader_cp = utils.load_imagenet_data(dir=dir, batch_size=256, num_workers=8)
+
+    for cp in range(check_min, check_max+1):
+        print(f"Calculating class selctivity for cp {cp}")
+        
+        cs_dict_path = data_dir / 'cs_dict_{}_cp{}'.format(loader, cp)
+
+        checkpoint = torch.load(data_dir / f'checkpoint_e{cp}.pth.tar')
+
+        # Load checkpoint state dict into the model 
+        """
+        The key values in checkpoint have different key names, they have an additional "module." in their name 
+        Therefore, cleaning the keys before updating state dict of the model 
+        """
+
+        for key in checkpoint['state_dict'].keys(): 
+            model_key = key.replace("module.", "")
+            model_dict[model_key] = checkpoint['state_dict'][key] 
+
+        model.load_state_dict(model_dict)
+        model.eval()
+        
+
+        if not cs_dict_path.is_file(): 
+            class_selectivity, class_activations = get_class_selectivity(model=model, val_loader=loader_cp) 
+            utils.save_file(class_selectivity, data_dir / 'cs_dict_{}_cp{}'.format(loader, cp))
+            utils.save_file(class_activations, data_dir / 'cs_dict_{}_cp{}_full'.format(loader, cp))
+
+
+if __name__ == '__main__': 
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--data_dir", type=str, required=True)
+    parser.add_argument("--img_dir", type=str, default=IMGNET_PATH)
+    parser.add_argument("--loader", default='val', type=str)
+    parser.add_argument("--check_min", type=int, default=0)
+    parser.add_argument("--check_max", type=int, default=90)
+    args = parser.parse_args()
+
+    data_dir = DATA_PATH / args.data_dir
+
+    calculate_selectivity(data_dir, args.loader, args.check_min, args.check_max)
 
 

@@ -34,7 +34,7 @@ else:
 
 channels = {4: 256, 5: 512, 6: 1024, 7: 2048}
 
-checkpoints_to_load = [i for i in range(args.check_min, args.check_max)]
+checkpoints_to_load = [i for i in range(args.check_min, args.check_max+1)]
 
 cs_for_every_cp = []
 
