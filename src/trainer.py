@@ -402,15 +402,16 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
             'epoch': epoch + 1,
             'arch': args.arch,
             'state_dict': model.state_dict(),
-            'best_acc1': best_acc1,
+            'train_acc1': acc1,
+            'train_acc5': acc5,
             'optimizer' : optimizer.state_dict(),
-            }, False, filename='checkpoint_e{}_b{}.pth.tar'.format(epoch, i))
+            }, False, filename='checkpoint_e{}_b{}.pth.tar'.format(epoch+1, i))
         
         if args.save_batch_targets: 
             batch_targets.append(target.cpu())
     
     if args.save_batch_targets: 
-        torch.save(batch_targets, EXP_DIR / 'bt_e{}.pt'.format(epoch))
+        torch.save(batch_targets, EXP_DIR / 'bt_e{}.pt'.format(epoch+1))
 
     return top1.avg, top5.avg 
         
