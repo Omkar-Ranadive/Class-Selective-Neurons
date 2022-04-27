@@ -64,14 +64,16 @@ for f in files:
     if not any(s in f for s in matches):
         cs_dict_path = DATA_DIR / f
         class_selectivity = utils.load_file(cs_dict_path)
-        cs_for_every_cp.append(class_selectivity)
         batch_num = re.search('b\d+', f).group()
         cp = re.search('cp\d+', f).group()[2:]
 
         if cp != cp_previous: 
             cp_previous = cp 
             bcount = 1 
-        
+        if int(cp) > args.check_max: 
+            break 
+
+        cs_for_every_cp.append(class_selectivity)
         X_values.append((cp+'b'+str(bcount)))
         bcount += 1
 
@@ -81,32 +83,32 @@ for f in files:
 for l, c in channels.items():
     print("Plotting graphs for Layer {}...".format(l))
     LAYER_PATH = EXP_DIR / "layer_{}".format(l)
-    os.makedirs(LAYER_PATH, exist_ok=True)
+    # os.makedirs(LAYER_PATH, exist_ok=True)
     number_of_plots = c
     
     ax1.set_title(f'Module {l} Class Selectivity Index')
     ax1.set_xlabel('Sub Checkpoints')
     ax1.set_ylabel('Class Selectivity Index')
     ax1.tick_params(axis='x', labelrotation = 0, labelsize='small')
-    ax1.xaxis.set_major_locator(plt.MaxNLocator(10))
+    # ax1.xaxis.set_major_locator(plt.MaxNLocator(10))
 
 
     ax2.set_title(f'Class Selectivity Index across all modules')
     ax2.set_xlabel('Sub Checkpoints')
     ax2.set_ylabel('Class Selectivity Index')
     ax2.tick_params(axis='x', labelrotation = 0, labelsize='small')
-    ax2.xaxis.set_major_locator(plt.MaxNLocator(10))
+    # ax2.xaxis.set_major_locator(plt.MaxNLocator(10))
 
     module_level_means = []
     module_level_stds = []
     for b in cs_for_every_cp[0][l].keys():
         BOTTLENECK_LAYER_PATH = LAYER_PATH / "bottleneck_layer_{}".format(b)
-        os.makedirs(BOTTLENECK_LAYER_PATH, exist_ok=True)
+        # os.makedirs(BOTTLENECK_LAYER_PATH, exist_ok=True)
       
         all_cs = []
         for i in range(c):
             CHANNEL_PATH = BOTTLENECK_LAYER_PATH / "channel_{}".format(i)
-            os.makedirs(CHANNEL_PATH, exist_ok=True)
+            # os.makedirs(CHANNEL_PATH, exist_ok=True)
 
             cs_for_channel = [cs_for_every_cp[x][l][b][i].item() for x in range(len(cs_for_every_cp))]
 

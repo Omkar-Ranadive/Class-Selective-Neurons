@@ -52,6 +52,8 @@ sns.set_theme()
 fig1, ax1 = plt.subplots()
 fig2, ax2 = plt.subplots()
 
+ax1.clear()
+ax2.clear()
 
 for cp in checkpoints_to_load:
     cs_dict_path = DATA_DIR / 'cs_dict_{}_cp{}'.format(args.loader, cp)
@@ -61,29 +63,42 @@ for cp in checkpoints_to_load:
 for l, c in channels.items():
     print("Plotting graphs for Layer {}...".format(l))
     LAYER_PATH = EXP_DIR / "layer_{}".format(l)
-    os.makedirs(LAYER_PATH, exist_ok=True)
+    # os.makedirs(LAYER_PATH, exist_ok=True)
     number_of_plots = c
     
     ax1.set_title(f'Module {l} Class Selectivity Index')
     ax1.set_xlabel('Checkpoints')
     ax1.set_ylabel('Class Selectivity Index')
+    ax1.xaxis.set_major_locator(plt.MaxNLocator(10))
+    ax1.xaxis.set_minor_locator(plt.MultipleLocator(1))
+    ax1.tick_params(axis='x', which='minor', length=3, color='r', direction='out')
+    ax1.tick_params(which='both', top=False, right=False)
 
     ax2.set_title(f'Class Selectivity Index across all modules')
     ax2.set_xlabel('Checkpoints')
     ax2.set_ylabel('Class Selectivity Index')
+    ax2.xaxis.set_major_locator(plt.MaxNLocator(10))
+    ax2.xaxis.set_minor_locator(plt.MultipleLocator(1))
+    ax2.tick_params(axis='x', which='minor', length=3, color='r', direction='out')
+    ax2.tick_params(which='both', top=False, right=False)
+
+
+
 
     module_level_means = []
     module_level_stds = []
     for b in cs_for_every_cp[0][l].keys():
         BOTTLENECK_LAYER_PATH = LAYER_PATH / "bottleneck_layer_{}".format(b)
-        os.makedirs(BOTTLENECK_LAYER_PATH, exist_ok=True)
+        # os.makedirs(BOTTLENECK_LAYER_PATH, exist_ok=True)
       
         all_cs = []
         for i in range(c):
             CHANNEL_PATH = BOTTLENECK_LAYER_PATH / "channel_{}".format(i)
-            os.makedirs(CHANNEL_PATH, exist_ok=True)
+            # os.makedirs(CHANNEL_PATH, exist_ok=True)
 
-            cs_for_channel = np.load(CHANNEL_PATH / 'layer{}_bottleneck{}_channel{}_cp{}_to_cp{}.npy'.format(l, b, i, args.check_min, args.check_max))
+            # cs_for_channel = np.load(CHANNEL_PATH / 'layer{}_bottleneck{}_channel{}_cp{}_to_cp{}.npy'.format(l, b, i, args.check_min, args.check_max))
+            cs_for_channel = [cs_for_every_cp[x][l][b][i].item() for x in range(len(cs_for_every_cp))]
+
             all_cs.append(cs_for_channel)
         
         all_cs = np.array(all_cs) 
@@ -110,7 +125,6 @@ for l, c in channels.items():
           
     fig1.savefig(SAVE_DIR / f'l{l}_cp{args.check_min}_to_cp{args.check_max}.png')
     ax1.clear()
-
 
 fig2.savefig(SAVE_DIR / f'All_Modules_cp{args.check_min}_to_cp{args.check_max}.png')
 ax2.clear()
