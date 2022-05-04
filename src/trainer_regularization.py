@@ -62,6 +62,7 @@ parser.add_argument('-p', '--print-freq', default=10, type=int,
                     metavar='N', help='print frequency (default: 10)')
 parser.add_argument('--resume', default='', type=str, metavar='PATH',
                     help='path to latest checkpoint (default: none)')
+parser.add_argument("--load_dir", default='', type=str, help='Name of folder to load checkpoints from')
 parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true',
                     help='evaluate model on validation set')
 parser.add_argument('--pretrained', dest='pretrained', action='store_true',
@@ -89,19 +90,27 @@ parser.add_argument('--inner_save', default=None, type=int,
 parser.add_argument('--save_batch_targets', action='store_true', help='Save batch target labels for each epoch')
 parser.add_argument("--use_ws", action='store_true', help='If true, weighted sampler is used')
 parser.add_argument('--start_cp', required=True, type=int)
+parser.add_argument("--alpha", required=True, type=float)
 
 best_acc1 = 0
 best_acc5 = 0 
 train_acc1 = 0 
 train_acc5 = 0 
 
+
 def main():
     args = parser.parse_args()
 
     global EXP_DIR
+    global LOAD_DIR 
     global logger 
     EXP_DIR = DATA_PATH / args.exp_name 
     os.makedirs(EXP_DIR, exist_ok=True)
+
+    if args.load_dir: 
+        LOAD_DIR = DATA_PATH / args.load_dir
+    else: 
+        LOAD_DIR = DATA_PATH 
 
     logging.basicConfig(level=logging.INFO, filename=str(EXP_DIR / 'info.log'), format='%(message)s', filemode='w')
     logger = logging.getLogger()
@@ -110,6 +119,8 @@ def main():
     logger.info(f'Training epochs: {args.epochs}')
     logger.info(f'Learning Rate: {args.lr}')
     logger.info(f'Model architecture: {args.arch}')
+    logger.info(f'Alpha: {args.alpha}')
+    logger.info(f'Start CP: {args.start_cp}')
 
     if args.seed is not None:
         random.seed(args.seed)
@@ -148,6 +159,7 @@ def main_worker(gpu, ngpus_per_node, args):
     global best_acc5 
     global train_acc1 
     global train_acc5 
+
 
     args.gpu = gpu
 
@@ -211,14 +223,14 @@ def main_worker(gpu, ngpus_per_node, args):
 
     # optionally resume from a checkpoint
     if args.resume:
-        if os.path.isfile(args.resume):
+        if os.path.isfile(LOAD_DIR / args.resume):
             print("=> loading checkpoint '{}'".format(args.resume))
             if args.gpu is None:
-                checkpoint = torch.load(args.resume)
+                checkpoint = torch.load(LOAD_DIR / args.resume)
             else:
                 # Map model to be loaded to specified single gpu.
                 loc = 'cuda:{}'.format(args.gpu)
-                checkpoint = torch.load(args.resume, map_location=loc)
+                checkpoint = torch.load(LOAD_DIR / args.resume, map_location=loc)
             args.start_epoch = checkpoint['epoch']
             best_acc1 = checkpoint['best_acc1']
             # Make sure the remaining keys exists 
@@ -239,7 +251,7 @@ def main_worker(gpu, ngpus_per_node, args):
             print("=> loaded checkpoint '{}' (epoch {})"
                   .format(args.resume, checkpoint['epoch']))
         else:
-            print("=> no checkpoint found at '{}'".format(args.resume))
+            print("=> no checkpoint found at '{}'".format(LOAD_DIR / args.resume))
 
     cudnn.benchmark = True
 
@@ -300,21 +312,22 @@ def main_worker(gpu, ngpus_per_node, args):
         return
 
 
-    # Save initialized weights 
-    acc1, acc5 = validate(val_loader, model, criterion, args)
-    save_checkpoint({
-        'epoch': 0,
-        'arch': args.arch,
-        'state_dict': model.state_dict(),
-        'best_acc1': acc1,
-        'best_acc5': acc5, 
-        'train_acc1': train_acc1,
-        'train_acc5': train_acc5,
-        'optimizer' : optimizer.state_dict(),
-    }, False, filename='checkpoint_e{}.pth.tar'.format(0))
+    if not args.resume: 
+        # Save initialized weights 
+        acc1, acc5 = validate(val_loader, model, criterion, args)
+        save_checkpoint({
+            'epoch': 0,
+            'arch': args.arch,
+            'state_dict': model.state_dict(),
+            'best_acc1': acc1,
+            'best_acc5': acc5, 
+            'val_acc1': acc1, 
+            'val_acc5': acc5, 
+            'train_acc1': train_acc1,
+            'train_acc5': train_acc5,
+            'optimizer' : optimizer.state_dict(),
+        }, False, filename='checkpoint_e{}.pth.tar'.format(0))
 
-    acc1_list = []
-    acc5_list = []
 
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
@@ -326,8 +339,6 @@ def main_worker(gpu, ngpus_per_node, args):
 
         # evaluate on validation set
         acc1, acc5 = validate(val_loader, model, criterion, args)
-        acc1_list.append(acc1)
-        acc5_list.append(acc5)
 
         # remember best acc@1 and save checkpoint
         is_best = acc1 > best_acc1
@@ -344,13 +355,12 @@ def main_worker(gpu, ngpus_per_node, args):
                 'state_dict': model.state_dict(),
                 'best_acc1': best_acc1,
                 'best_acc5': best_acc5, 
+                'val_acc1': acc1, 
+                'val_acc5': acc5, 
                 'train_acc1': train_acc1,
                 'train_acc5': train_acc5,
                 'optimizer' : optimizer.state_dict(),
             }, is_best, filename='checkpoint_e{}.pth.tar'.format(epoch+1))
-    
-    np.save(EXP_DIR / 'top_1_acc_reg_applied_from_cp{}.npy'.format(args.start_cp), acc1_list)
-    np.save(EXP_DIR / 'top_5_acc_reg_applied_from_cp{}.npy'.format(args.start_cp), acc5_list)
 
 
 def train(train_loader, model, criterion, optimizer, epoch, args):
@@ -387,7 +397,7 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
             target = target.cuda(args.gpu, non_blocking=True)
 
         # get class selectivity
-        cs_dict_path = DATA_PATH / 'cs_dict_val_cp{}'.format(args.start_cp)
+        cs_dict_path = LOAD_DIR / 'cs_dict_val_cp{}'.format(args.start_cp)
         class_selectivity = utils.load_file(cs_dict_path)
 
         # compute output
@@ -402,7 +412,7 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
             layer_selectivity.append(avg_unit_selectivity)
         regularization_term = sum(layer_selectivity) / len(layer_selectivity)
 
-        alpha = -100
+        alpha = args.alpha
         loss = criterion(output, target) - alpha*regularization_term
 
         # measure accuracy and record loss

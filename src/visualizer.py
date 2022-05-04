@@ -148,7 +148,7 @@ def combine_plots_from_dirs(dirs, rows=2, cols=2):
         fig.clear()
 
 
-def compare_cp_acc(dirs):
+def compare_cp_acc(dirs, key):
 
     for dir in dirs: 
         DATA_DIR = DATA_PATH / dir 
@@ -158,14 +158,16 @@ def compare_cp_acc(dirs):
         for cp in files: 
             if '.tar' in cp: 
                 cur_cp = torch.load(DATA_DIR / cp)
-                accs.append(cur_cp['best_acc1'].item())
+                acc = cur_cp[key] if isinstance(cur_cp[key], int) else cur_cp[key].item()
+                accs.append(acc)
         
         plt.plot(range(0, len(accs)), accs, label='{}'.format(dir))
     
+    plt.title(f"{key}")
     plt.xlabel('Checkpoints')
     plt.ylabel('Accuracy')
     plt.legend()
-    plt.savefig(SAVE_DIR / 'cp_acc_com.png')
+    plt.savefig(SAVE_DIR / f'cp_{key}_com.png')
  
 
 
@@ -178,7 +180,9 @@ if __name__ == '__main__':
     parser.add_argument("--check_max", type=int)
     parser.add_argument("--save_dir", default=None, type=str)
     parser.add_argument("--split_per", default=None, type=float)
+    parser.add_argument("--k", default=None, type=str)
     parser.add_argument('-l','--list', nargs='+')
+    
     args = parser.parse_args()
 
     EXP_DIR_RAN = EXP_PATH / args.exp_name_ran
@@ -204,4 +208,4 @@ if __name__ == '__main__':
     elif args.vis == 'combd':
         combine_plots_from_dirs(dirs=args.list)
     elif args.vis == 'compcp':
-        compare_cp_acc(dirs=args.list)
+        compare_cp_acc(dirs=args.list, key=args.k)
