@@ -161,7 +161,7 @@ def compare_cp_acc(dirs, key):
                 acc = cur_cp[key] if isinstance(cur_cp[key], int) else cur_cp[key].item()
                 accs.append(acc)
         
-        plt.plot(range(0, len(accs)), accs, label='{}'.format(dir))
+        plt.plot(range(0, len(accs)), accs, label='{}'.format(dir), alpha=0.8)
     
     plt.title(f"{key}")
     plt.xlabel('Checkpoints')

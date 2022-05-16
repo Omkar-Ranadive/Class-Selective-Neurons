@@ -12,6 +12,7 @@ import os
 import logging 
 from datetime import datetime
 import numpy as np
+import seaborn as sns 
 
 
 parser = argparse.ArgumentParser()
@@ -24,6 +25,8 @@ parser.add_argument("--check_min", default=None, type=int)
 parser.add_argument("--check_max", default=None, type=int)
 args = parser.parse_args()
 
+
+sns.set_theme()
 
 """
 Checkpoint structure: 
@@ -72,10 +75,9 @@ if args.check_min and args.check_max:
     checkpoints_to_load = [i for i in range(args.check_min, args.check_max+1)]
 else: 
     # Load all of the first 15 checkpoints as selectivity is more prominent in the earlier epochs 
-    checkpoints_to_load = [i for i in range(0, 16)]
-    # Then load remaining checkpoints with step of 5 
-    checkpoints_to_load.extend(list(range(16, 91, 5)))
-    
+    checkpoints_to_load = [i for i in range(1, 16)]
+    # Then load remaining checkpoints with step of 10
+    checkpoints_to_load.extend(list(range(20, 91, 10)))
 
 
 # Load pre-trained Resnet 
@@ -84,7 +86,7 @@ model_dict = model.state_dict()
 
 
 for cp in checkpoints_to_load: 
-    checkpoint = torch.load(DATA_PATH / 'model_checkpoints' / 'CHECKPOINTS' / 'EXPE1' / 'checkpoint_epoch{}.pth.tar'.format(cp))
+    checkpoint = torch.load(DATA_DIR / f'checkpoint_e{cp}.pth.tar')
 
     # Load checkpoint state dict into the model 
     """
@@ -101,11 +103,11 @@ for cp in checkpoints_to_load:
     
     # calculate class activations for all the feature maps
     # val_loader = utils.load_imagenet_data(dir=val_dir, batch_size=1, num_workers=8)
-    cs_dict_path = DATA_PATH / 'cs_dict_{}_cp{}'.format(args.loader, cp)
+    cs_dict_path = DATA_DIR / 'cs_dict_{}_cp{}'.format(args.loader, cp)
     if not cs_dict_path.is_file(): 
         class_selectivity, class_activations = get_class_selectivity(model=model, val_loader=loader_cp) 
-        utils.save_file(class_selectivity, DATA_PATH / 'cs_dict_{}_cp{}'.format(args.loader, cp))
-        utils.save_file(class_activations, DATA_PATH / 'cs_dict_{}_cp{}_full'.format(args.loader, cp))
+        utils.save_file(class_selectivity, DATA_DIR / 'cs_dict_{}_cp{}'.format(args.loader, cp))
+        utils.save_file(class_activations, DATA_DIR / 'cs_dict_{}_cp{}_full'.format(args.loader, cp))
     else: 
         class_selectivity = utils.load_file(cs_dict_path)
 
@@ -114,7 +116,11 @@ for cp in checkpoints_to_load:
         ablate_dict = {layer: [0, 1, 2, 3, 4, 5]}
         t1_acc = []
         t5_acc = []
-        X = list(range(0, channels[layer]+1, 10)) # Stepping the channels to speed it up 
+        first_half = channels[layer]//2 
+        X1 = list(range(0, first_half, 15))
+        X2 = list(range(first_half, channels[layer]+1, 40)) 
+        X = X1 + X2 
+        # X = list(range(0, channels[layer]+1, 10)) # Stepping the channels to speed it up 
         
         for nc in X: 
             t1, t5 = validate(val_loader=loader, model=model, criterion=criterion, ablate_dict=ablate_dict, num_channels=nc, class_selectivity=class_selectivity)
@@ -130,7 +136,7 @@ for cp in checkpoints_to_load:
         plt.plot(X, t5_acc, label='Top 5 Acc')
         plt.title('Layer {}'.format(layer))
         plt.legend()
-        plt.savefig(str(EXP_DIR / '{}_cp{}_layer_{}.png'.format(datetime.now().strftime('%m_%d_%Y-%H_%M_%S'), cp, layer)))
+        plt.savefig(str(EXP_DIR / 'cp{}_layer_{}.png'.format(cp, layer)))
         plt.clf()
 
         # Save data for future use 
