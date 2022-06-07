@@ -19,8 +19,9 @@ import re
 import os 
 import sys 
 
+
 def forward(model, input_batch, target, class_activations):
-    resnet_layers = nn.Sequential(*list(model.children()))
+    resnet_layers = nn.Sequential(*list(model.module.children()))
 
     for index, layer in enumerate(resnet_layers):
         if isinstance(layer, torch.nn.modules.linear.Linear):
@@ -95,8 +96,6 @@ def bottleneck_layer(input_batch, child):
 
 
 def get_class_activations(model, val_loader):
-    # switch to evaluate mode
-    model.eval()
     model.to('cuda')
     """
     format --> {
@@ -114,8 +113,8 @@ def get_class_activations(model, val_loader):
         7: {}
     }
     counter = 0
+    end = time.time()
     with torch.no_grad():
-        end = time.time()
         for i, (images, target) in tqdm(enumerate(val_loader)):
         
             if torch.cuda.is_available():

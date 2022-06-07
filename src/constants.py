@@ -7,3 +7,4 @@ EXP_PATH = PARENT_PATH / '../experiments'
 
 
 IMGNET_CLASSES = 1000 
+EPSILON = 1e-6

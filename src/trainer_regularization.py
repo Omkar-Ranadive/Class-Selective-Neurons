@@ -26,7 +26,10 @@ import torchvision.datasets as datasets
 import torchvision.models as models
 
 from constants import IMGNET_PATH, DATA_PATH
+from class_selectivity_reg import get_class_selectivity
 import utils
+
+
 
 model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
@@ -87,9 +90,9 @@ parser.add_argument('--multiprocessing-distributed', action='store_true',
 parser.add_argument('--exp_name', required=True, type=str)
 parser.add_argument('--inner_save', default=None, type=int, 
                     help="Save within checkpoints")
+parser.add_argument("--sel_count", default=None, type=int, required=True, help="Number of times selectivity is calculated during each epoch")
 parser.add_argument('--save_batch_targets', action='store_true', help='Save batch target labels for each epoch')
 parser.add_argument("--use_ws", action='store_true', help='If true, weighted sampler is used')
-parser.add_argument('--start_cp', required=True, type=int)
 parser.add_argument("--alpha", required=True, type=float)
 
 best_acc1 = 0
@@ -97,13 +100,14 @@ best_acc5 = 0
 train_acc1 = 0 
 train_acc5 = 0 
 
-
+ 
 def main():
     args = parser.parse_args()
 
     global EXP_DIR
     global LOAD_DIR 
     global logger 
+
     EXP_DIR = DATA_PATH / args.exp_name 
     os.makedirs(EXP_DIR, exist_ok=True)
 
@@ -120,7 +124,8 @@ def main():
     logger.info(f'Learning Rate: {args.lr}')
     logger.info(f'Model architecture: {args.arch}')
     logger.info(f'Alpha: {args.alpha}')
-    logger.info(f'Start CP: {args.start_cp}')
+    logger.info(f'Start Epoch: {args.resume}')
+    logger.info(f'Selectivity calculated {args.sel_count} per epoch')
 
     if args.seed is not None:
         random.seed(args.seed)
@@ -246,8 +251,10 @@ def main_worker(gpu, ngpus_per_node, args):
                 best_acc1 = best_acc1.to(args.gpu)
                 best_acc5, train_acc5, train_acc1 = best_acc5.to(args.gpu), train_acc5.to(args.gpu), train_acc1.to(args.gpu)
 
+            # Load the state dict 
             model.load_state_dict(checkpoint['state_dict'])
             optimizer.load_state_dict(checkpoint['optimizer'])
+
             print("=> loaded checkpoint '{}' (epoch {})"
                   .format(args.resume, checkpoint['epoch']))
         else:
@@ -328,6 +335,9 @@ def main_worker(gpu, ngpus_per_node, args):
             'optimizer' : optimizer.state_dict(),
         }, False, filename='checkpoint_e{}.pth.tar'.format(0))
 
+    # loader_cp = utils.load_imagenet_data(dir=IMGNET_PATH / 'val', batch_size=32, num_workers=args.workers)
+
+
 
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
@@ -335,7 +345,7 @@ def main_worker(gpu, ngpus_per_node, args):
         adjust_learning_rate(optimizer, epoch, args)
 
         # train for one epoch
-        train_acc1, train_acc5 = train(train_loader, model, criterion, optimizer, epoch, args)
+        train_acc1, train_acc5 = train(train_loader, val_loader, model, criterion, optimizer, epoch, args)
 
         # evaluate on validation set
         acc1, acc5 = validate(val_loader, model, criterion, args)
@@ -363,7 +373,7 @@ def main_worker(gpu, ngpus_per_node, args):
             }, is_best, filename='checkpoint_e{}.pth.tar'.format(epoch+1))
 
 
-def train(train_loader, model, criterion, optimizer, epoch, args):
+def train(train_loader, val_loader, model, criterion, optimizer, epoch, args):
     batch_time = AverageMeter('Time', ':6.3f')
     data_time = AverageMeter('Data', ':6.3f')
     losses = AverageMeter('Loss', ':.4e')
@@ -378,6 +388,10 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
         print("Num batches {}  Total saves per checkpoint {} Save Every {}".format(
             num_batches, args.inner_save, save_every))
 
+    if args.sel_count: 
+        num_cal = num_batches // args.sel_count 
+        print(f"Num batches {num_batches}, Num of calculations: {args.sel_count}, Calculate every {num_cal}")
+
     progress = ProgressMeter(
         num_batches,
         [batch_time, data_time, losses, top1, top5],
@@ -385,8 +399,10 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
 
     # switch to train mode
     model.train()
+    
 
     end = time.time()
+
     for i, (images, target) in enumerate(train_loader):
         # measure data loading time
         data_time.update(time.time() - end)
@@ -396,12 +412,16 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
         if torch.cuda.is_available():
             target = target.cuda(args.gpu, non_blocking=True)
 
-        # get class selectivity
-        cs_dict_path = LOAD_DIR / 'cs_dict_val_cp{}'.format(args.start_cp)
-        class_selectivity = utils.load_file(cs_dict_path)
+        # # get class selectivity
+        # cs_dict_path = LOAD_DIR / 'cs_dict_val_cp{}'.format(args.start_cp)
+        # class_selectivity = utils.load_file(cs_dict_path)
 
         # compute output
         output = model(images)
+
+        if i % num_cal == 0:
+            class_selectivity, class_activations = get_class_selectivity(model=model, val_loader=val_loader) 
+
         
         layer_selectivity = []
         for layer_k, layer_v in class_selectivity.items():
