@@ -174,6 +174,38 @@ def get_class_selectivity(model, val_loader):
     
     return class_selectivity, class_activations
 
+def get_selectivity_grad(index, layer, class_activations, input_batch, target): 
+    if isinstance(layer, torch.nn.modules.linear.Linear):
+        # Flatten input batch once linear layer is reached 
+        input_batch = torch.flatten(input_batch, start_dim=1)
+    
+    # If the present layer is sequential, go deeper 
+    if isinstance(layer, torch.nn.modules.container.Sequential):
+        for num, child in enumerate(layer.children()): 
+            if isinstance(child, Bottleneck): 
+                input_batch = bottleneck_layer(input_batch, child)
+                activations = torch.mean(input_batch.view(input_batch.size(0), input_batch.size(1), -1), dim=2)
+
+                for i, activation in enumerate(activations): 
+                    activation = torch.unsqueeze(activation, dim=0)
+                    class_index = target[i].item() 
+
+                    if class_index not in class_activations[index]:
+                        class_activations[index].update({class_index: {}})  # ex: {layer_3: {class_0: {} } }
+                    
+                    if num in class_activations[index][class_index]:
+                        class_activations[index][class_index][num] += activation.cpu()
+                    else:
+                        class_activations[index][class_index].update({num: activation.cpu()})  # ex: {layer_3: {class_0: {bottleneck_0: activation} } }
+
+            else: 
+                input_batch = child(input_batch)
+
+    else:
+        input_batch = layer(input_batch)
+
+    return input_batch, class_activations
+        
 
 def calculate_selectivity(data_dir, loader, check_min, check_max): 
 

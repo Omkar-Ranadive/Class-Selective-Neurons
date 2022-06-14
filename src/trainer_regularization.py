@@ -26,7 +26,7 @@ import torchvision.datasets as datasets
 import torchvision.models as models
 
 from constants import IMGNET_PATH, DATA_PATH
-from class_selectivity_reg import get_class_selectivity
+from class_selectivity_reg import get_class_selectivity, get_selectivity_grad
 import utils
 
 
@@ -204,6 +204,7 @@ def main_worker(gpu, ngpus_per_node, args):
             args.workers = int((args.workers + ngpus_per_node - 1) / ngpus_per_node)
             model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
         else:
+            print("Running distributed data parallelism")
             model.cuda()
             # DistributedDataParallel will divide and allocate batch_size to all
             # available GPUs if device_ids are not set
@@ -213,6 +214,7 @@ def main_worker(gpu, ngpus_per_node, args):
         model = model.cuda(args.gpu)
     else:
         # DataParallel will divide and allocate batch_size to all available GPUs
+        print("Running normal data parallelism")
         if args.arch.startswith('alexnet') or args.arch.startswith('vgg'):
             model.features = torch.nn.DataParallel(model.features)
             model.cuda()
@@ -399,9 +401,12 @@ def train(train_loader, val_loader, model, criterion, optimizer, epoch, args):
 
     # switch to train mode
     model.train()
-    
+    epsilon = 1e-6
 
+    
     end = time.time()
+
+  
 
     for i, (images, target) in enumerate(train_loader):
         # measure data loading time
@@ -417,12 +422,57 @@ def train(train_loader, val_loader, model, criterion, optimizer, epoch, args):
         # class_selectivity = utils.load_file(cs_dict_path)
 
         # compute output
-        output = model(images)
+        # output = model(images)
+        # if i % num_cal == 0:
+        #     class_selectivity, class_activations = get_class_selectivity(model=model, val_loader=val_loader) 
 
-        if i % num_cal == 0:
-            class_selectivity, class_activations = get_class_selectivity(model=model, val_loader=val_loader) 
+        # output = model(images)
 
-        
+        resnet_layers = nn.Sequential(*list(model.module.children()))
+        output = torch.clone(images).to('cuda')
+
+        class_activations = {
+        4: {},
+        5: {},
+        6: {},
+        7: {}
+        }
+
+        class_selectivity = {
+            4: {},
+            5: {},
+            6: {},
+            7: {}
+        }
+
+        for index, layer in enumerate(resnet_layers):
+            output, class_activations = get_selectivity_grad(index, layer, class_activations, output, target) 
+       
+        # Layer_k = outer layer num, layer_v = dict of the form {class_i: {} ... } 
+        for layer_k, layer_v in class_activations.items():
+            # for class_k, class_v in class_activations[layer_k].items():
+            # For a layer, the number of bottleneck layers will be the same 
+            # So, just choose any class to get the index of bottleneck layers 
+            random_key = target[0].item()
+
+            for bottleneck_k, bottleneck_v in class_activations[layer_k][random_key].items():
+                for ci, class_k in enumerate(sorted(class_activations[layer_k].keys())):
+                    if ci > 0:
+                        all_activations_for_this_bottleneck = torch.cat((all_activations_for_this_bottleneck, class_activations[layer_k][class_k][bottleneck_k]), dim=0)
+                    else:
+                        all_activations_for_this_bottleneck = class_activations[layer_k][class_k][bottleneck_k]
+                
+                all_activations_for_this_bottleneck = all_activations_for_this_bottleneck.t()
+
+                u_max, u_max_indices = torch.max(all_activations_for_this_bottleneck, dim=1)
+                u_sum = torch.sum(all_activations_for_this_bottleneck, dim=1)
+                u_minus_max = (u_sum - u_max) / (all_activations_for_this_bottleneck.shape[1] - 1)
+
+                selectivity = (u_max - u_minus_max) / (u_max + u_minus_max + epsilon)
+                
+                class_selectivity[layer_k].update({bottleneck_k: selectivity})
+    
+    
         layer_selectivity = []
         for layer_k, layer_v in class_selectivity.items():
             unit_selectivity = []
