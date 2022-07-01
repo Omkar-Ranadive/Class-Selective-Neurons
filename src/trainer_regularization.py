@@ -90,10 +90,12 @@ parser.add_argument('--multiprocessing-distributed', action='store_true',
 parser.add_argument('--exp_name', required=True, type=str)
 parser.add_argument('--inner_save', default=None, type=int, 
                     help="Save within checkpoints")
-parser.add_argument("--sel_count", default=None, type=int, required=True, help="Number of times selectivity is calculated during each epoch")
+# parser.add_argument("--sel_count", default=None, type=int, required=True, help="Number of times selectivity is calculated during each epoch")
 parser.add_argument('--save_batch_targets', action='store_true', help='Save batch target labels for each epoch')
 parser.add_argument("--use_ws", action='store_true', help='If true, weighted sampler is used')
 parser.add_argument("--alpha", required=True, type=float)
+parser.add_argument("--ignore_last", action='store_true', help='If true, dont regularizer the last layer for selectivity')
+
 
 best_acc1 = 0
 best_acc5 = 0 
@@ -116,7 +118,7 @@ def main():
     else: 
         LOAD_DIR = DATA_PATH 
 
-    logging.basicConfig(level=logging.INFO, filename=str(EXP_DIR / 'info.log'), format='%(message)s', filemode='w')
+    logging.basicConfig(level=logging.INFO, filename=str(EXP_DIR / 'info.log'), format='%(message)s', filemode='a')
     logger = logging.getLogger()
 
     logger.info(f'Batch size: {args.batch_size}')
@@ -125,7 +127,8 @@ def main():
     logger.info(f'Model architecture: {args.arch}')
     logger.info(f'Alpha: {args.alpha}')
     logger.info(f'Start Epoch: {args.resume}')
-    logger.info(f'Selectivity calculated {args.sel_count} per epoch')
+    logger.info(f'Ignoring selectivity regularization for module 7: {args.ignore_last}')
+    # logger.info(f'Selectivity calculated {args.sel_count} per epoch')
 
     if args.seed is not None:
         random.seed(args.seed)
@@ -390,9 +393,9 @@ def train(train_loader, val_loader, model, criterion, optimizer, epoch, args):
         print("Num batches {}  Total saves per checkpoint {} Save Every {}".format(
             num_batches, args.inner_save, save_every))
 
-    if args.sel_count: 
-        num_cal = num_batches // args.sel_count 
-        print(f"Num batches {num_batches}, Num of calculations: {args.sel_count}, Calculate every {num_cal}")
+    # if args.sel_count: 
+    #     num_cal = num_batches // args.sel_count 
+    #     print(f"Num batches {num_batches}, Num of calculations: {args.sel_count}, Calculate every {num_cal}")
 
     progress = ProgressMeter(
         num_batches,
@@ -476,10 +479,17 @@ def train(train_loader, val_loader, model, criterion, optimizer, epoch, args):
         layer_selectivity = []
         for layer_k, layer_v in class_selectivity.items():
             unit_selectivity = []
-            for bottleneck_k, bottleneck_v in class_selectivity[layer_k].items():
-                unit_selectivity += class_selectivity[layer_k][bottleneck_k]
-            avg_unit_selectivity = sum(unit_selectivity) / len(unit_selectivity)
-            layer_selectivity.append(avg_unit_selectivity)
+            if args.ignore_last and layer_k != 7: 
+                for bottleneck_k, bottleneck_v in class_selectivity[layer_k].items():
+                    unit_selectivity += class_selectivity[layer_k][bottleneck_k]
+                avg_unit_selectivity = sum(unit_selectivity) / len(unit_selectivity)
+                layer_selectivity.append(avg_unit_selectivity)
+            elif not args.ignore_last:
+                for bottleneck_k, bottleneck_v in class_selectivity[layer_k].items():
+                    unit_selectivity += class_selectivity[layer_k][bottleneck_k]
+                avg_unit_selectivity = sum(unit_selectivity) / len(unit_selectivity)
+                layer_selectivity.append(avg_unit_selectivity)
+
         regularization_term = sum(layer_selectivity) / len(layer_selectivity)
 
         alpha = args.alpha

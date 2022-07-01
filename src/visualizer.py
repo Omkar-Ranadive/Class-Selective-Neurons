@@ -157,17 +157,30 @@ def compare_cp_acc(dirs, key):
 
         for cp in files: 
             if '.tar' in cp: 
-                cur_cp = torch.load(DATA_DIR / cp)
-                acc = cur_cp[key] if isinstance(cur_cp[key], int) else cur_cp[key].item()
-                accs.append(acc)
-        
+                if re.search('e\d+', cp): 
+                    cp_num = re.search('e\d+', cp).group()[1:]
+                    if args.check_min is not None and args.check_max is not None: 
+                        if args.check_min <= int(cp_num) <= args.check_max: 
+                            cur_cp = torch.load(DATA_DIR / cp)
+                            acc = cur_cp[key] if isinstance(cur_cp[key], int) else cur_cp[key].item()
+                            accs.append(acc)
+                    else: 
+                        cur_cp = torch.load(DATA_DIR / cp)
+                        acc = cur_cp[key] if isinstance(cur_cp[key], int) else cur_cp[key].item()
+                        accs.append(acc)
+            
         plt.plot(range(0, len(accs)), accs, label='{}'.format(dir), alpha=0.8)
     
     plt.title(f"{key}")
     plt.xlabel('Checkpoints')
     plt.ylabel('Accuracy')
     plt.legend()
-    plt.savefig(SAVE_DIR / f'cp_{key}_com.png')
+    if args.check_min is None and args.check_max is None: 
+        plt.savefig(SAVE_DIR / f'cp_{key}_com.png')
+    else: 
+        plt.savefig(SAVE_DIR / f'cp_{args.check_min}_to_{args.check_max}_{key}_com.png')
+
+
  
 
 
@@ -176,8 +189,8 @@ if __name__ == '__main__':
     parser.add_argument("--exp_name_ran", default="dummy_ran", type=str)
     parser.add_argument("--exp_name_cs", default="dummy_cs", type=str)
     parser.add_argument("--vis", default="nor", type=str)
-    parser.add_argument("--check_min", type=int)
-    parser.add_argument("--check_max", type=int)
+    parser.add_argument("--check_min", type=int, default=None)
+    parser.add_argument("--check_max", type=int, default=None)
     parser.add_argument("--save_dir", default=None, type=str)
     parser.add_argument("--split_per", default=None, type=float)
     parser.add_argument("--k", default=None, type=str)
