@@ -28,7 +28,7 @@ import torchvision.models as models
 from constants import IMGNET_PATH, DATA_PATH
 from class_selectivity_reg import get_class_selectivity, get_selectivity_grad
 import utils
-
+import re 
 
 
 model_names = sorted(name for name in models.__dict__
@@ -93,7 +93,7 @@ parser.add_argument('--inner_save', default=None, type=int,
 # parser.add_argument("--sel_count", default=None, type=int, required=True, help="Number of times selectivity is calculated during each epoch")
 parser.add_argument('--save_batch_targets', action='store_true', help='Save batch target labels for each epoch')
 parser.add_argument("--use_ws", action='store_true', help='If true, weighted sampler is used')
-parser.add_argument("--alpha", required=True, type=float)
+# parser.add_argument("--alpha", required=True, type=float)
 parser.add_argument("--ignore_last", action='store_true', help='If true, dont regularizer the last layer for selectivity')
 
 
@@ -121,11 +121,19 @@ def main():
     logging.basicConfig(level=logging.INFO, filename=str(EXP_DIR / 'info.log'), format='%(message)s', filemode='a')
     logger = logging.getLogger()
 
+    # Load the alphas (specify the alphas for the expeirment in alphas.txt file)
+    assert (DATA_PATH / 'alphas.txt').exists(), "Create an alphas.txt file to continue. Example: 10, 10, 0, 0 will assign those alphas to epoch 1 to 4 respectively"
+    with open(DATA_PATH / 'alphas.txt', 'r') as f: 
+        alphas = re.split(", ", f.read())
+        args.alphas = list(map(float, alphas))
+
+
     logger.info(f'Batch size: {args.batch_size}')
     logger.info(f'Training epochs: {args.epochs}')
     logger.info(f'Learning Rate: {args.lr}')
     logger.info(f'Model architecture: {args.arch}')
-    logger.info(f'Alpha: {args.alpha}')
+    # logger.info(f'Alpha: {args.alpha}')
+    logger.info(f'Alphas: {args.alphas}')
     logger.info(f'Start Epoch: {args.resume}')
     logger.info(f'Ignoring selectivity regularization for module 7: {args.ignore_last}')
     # logger.info(f'Selectivity calculated {args.sel_count} per epoch')
@@ -344,13 +352,13 @@ def main_worker(gpu, ngpus_per_node, args):
 
 
 
-    for epoch in range(args.start_epoch, args.epochs):
+    for a_index, epoch in enumerate(range(args.start_epoch, args.epochs)):
         if args.distributed:
             train_sampler.set_epoch(epoch)
         adjust_learning_rate(optimizer, epoch, args)
 
         # train for one epoch
-        train_acc1, train_acc5 = train(train_loader, val_loader, model, criterion, optimizer, epoch, args)
+        train_acc1, train_acc5 = train(train_loader, val_loader, model, criterion, optimizer, epoch, args, a_index)
 
         # evaluate on validation set
         acc1, acc5 = validate(val_loader, model, criterion, args)
@@ -378,7 +386,7 @@ def main_worker(gpu, ngpus_per_node, args):
             }, is_best, filename='checkpoint_e{}.pth.tar'.format(epoch+1))
 
 
-def train(train_loader, val_loader, model, criterion, optimizer, epoch, args):
+def train(train_loader, val_loader, model, criterion, optimizer, epoch, args, a_index):
     batch_time = AverageMeter('Time', ':6.3f')
     data_time = AverageMeter('Data', ':6.3f')
     losses = AverageMeter('Loss', ':.4e')
@@ -492,7 +500,7 @@ def train(train_loader, val_loader, model, criterion, optimizer, epoch, args):
 
         regularization_term = sum(layer_selectivity) / len(layer_selectivity)
 
-        alpha = args.alpha
+        alpha = args.alphas[a_index]
         loss = criterion(output, target) - alpha*regularization_term
 
         # measure accuracy and record loss
