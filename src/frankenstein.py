@@ -10,6 +10,7 @@ import time
 import warnings
 import logging 
 from enum import Enum
+import numpy as np
 
 import torch
 import torch.nn as nn
@@ -25,6 +26,10 @@ import torchvision.datasets as datasets
 import torchvision.models as models
 
 from constants import IMGNET_PATH, DATA_PATH
+from class_selectivity_reg import get_class_selectivity, get_selectivity_grad
+import utils
+import re 
+import sys 
 
 model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
@@ -61,7 +66,6 @@ parser.add_argument('-p', '--print-freq', default=10, type=int,
 parser.add_argument('--resume', default='', type=str, metavar='PATH',
                     help='path to latest checkpoint (default: none)')
 parser.add_argument("--load_dir", default='', type=str, help='Name of folder to load checkpoints from')
-
 parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true',
                     help='evaluate model on validation set')
 parser.add_argument('--pretrained', dest='pretrained', action='store_true',
@@ -86,20 +90,26 @@ parser.add_argument('--multiprocessing-distributed', action='store_true',
 parser.add_argument('--exp_name', required=True, type=str)
 parser.add_argument('--inner_save', default=None, type=int, 
                     help="Save within checkpoints")
+# parser.add_argument("--sel_count", default=None, type=int, required=True, help="Number of times selectivity is calculated during each epoch")
 parser.add_argument('--save_batch_targets', action='store_true', help='Save batch target labels for each epoch')
 parser.add_argument("--use_ws", action='store_true', help='If true, weighted sampler is used')
+# parser.add_argument("--alpha", required=True, type=float)
+parser.add_argument("--ignore_last", action='store_true', help='If true, dont regularizer the last layer for selectivity')
+
 
 best_acc1 = 0
 best_acc5 = 0 
 train_acc1 = 0 
 train_acc5 = 0 
 
+ 
 def main():
     args = parser.parse_args()
 
     global EXP_DIR
-    global LOAD_DIR
+    global LOAD_DIR 
     global logger 
+
     EXP_DIR = DATA_PATH / args.exp_name 
     os.makedirs(EXP_DIR, exist_ok=True)
 
@@ -108,16 +118,25 @@ def main():
     else: 
         LOAD_DIR = DATA_PATH 
 
-
     logging.basicConfig(level=logging.INFO, filename=str(EXP_DIR / 'info.log'), format='%(message)s', filemode='a')
     logger = logging.getLogger()
+
+    # Load the alphas (specify the alphas for the expeirment in alphas.txt file)
+    assert (DATA_PATH / 'alphas.txt').exists(), "Create an alphas.txt file to continue. Example: 10, 10, 0, 0 will assign those alphas to epoch 1 to 4 respectively"
+    with open(DATA_PATH / 'alphas.txt', 'r') as f: 
+        alphas = re.split(", ", f.read())
+        args.alphas = list(map(float, alphas))
+
 
     logger.info(f'Batch size: {args.batch_size}')
     logger.info(f'Training epochs: {args.epochs}')
     logger.info(f'Learning Rate: {args.lr}')
     logger.info(f'Model architecture: {args.arch}')
+    # logger.info(f'Alpha: {args.alpha}')
+    logger.info(f'Alphas: {args.alphas}')
     logger.info(f'Start Epoch: {args.resume}')
-
+    logger.info(f'Ignoring selectivity regularization for module 7: {args.ignore_last}')
+    # logger.info(f'Selectivity calculated {args.sel_count} per epoch')
 
     if args.seed is not None:
         random.seed(args.seed)
@@ -157,6 +176,7 @@ def main_worker(gpu, ngpus_per_node, args):
     global train_acc1 
     global train_acc5 
 
+
     args.gpu = gpu
 
     if args.gpu is not None:
@@ -195,6 +215,7 @@ def main_worker(gpu, ngpus_per_node, args):
             args.workers = int((args.workers + ngpus_per_node - 1) / ngpus_per_node)
             model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
         else:
+            print("Running distributed data parallelism")
             model.cuda()
             # DistributedDataParallel will divide and allocate batch_size to all
             # available GPUs if device_ids are not set
@@ -204,6 +225,7 @@ def main_worker(gpu, ngpus_per_node, args):
         model = model.cuda(args.gpu)
     else:
         # DataParallel will divide and allocate batch_size to all available GPUs
+        print("Running normal data parallelism")
         if args.arch.startswith('alexnet') or args.arch.startswith('vgg'):
             model.features = torch.nn.DataParallel(model.features)
             model.cuda()
@@ -242,12 +264,14 @@ def main_worker(gpu, ngpus_per_node, args):
                 best_acc1 = best_acc1.to(args.gpu)
                 best_acc5, train_acc5, train_acc1 = best_acc5.to(args.gpu), train_acc5.to(args.gpu), train_acc1.to(args.gpu)
 
+            # Load the state dict 
             model.load_state_dict(checkpoint['state_dict'])
             optimizer.load_state_dict(checkpoint['optimizer'])
+
             print("=> loaded checkpoint '{}' (epoch {})"
                   .format(args.resume, checkpoint['epoch']))
         else:
-            print("=> no checkpoint found at '{}'".format(args.resume))
+            print("=> no checkpoint found at '{}'".format(LOAD_DIR / args.resume))
 
     cudnn.benchmark = True
 
@@ -307,6 +331,7 @@ def main_worker(gpu, ngpus_per_node, args):
         validate(val_loader, model, criterion, args)
         return
 
+
     if not args.resume: 
         # Save initialized weights 
         acc1, acc5 = validate(val_loader, model, criterion, args)
@@ -323,13 +348,17 @@ def main_worker(gpu, ngpus_per_node, args):
             'optimizer' : optimizer.state_dict(),
         }, False, filename='checkpoint_e{}.pth.tar'.format(0))
 
-    for epoch in range(args.start_epoch, args.epochs):
+    # loader_cp = utils.load_imagenet_data(dir=IMGNET_PATH / 'val', batch_size=32, num_workers=args.workers)
+
+
+
+    for a_index, epoch in enumerate(range(args.start_epoch, args.epochs)):
         if args.distributed:
             train_sampler.set_epoch(epoch)
         adjust_learning_rate(optimizer, epoch, args)
 
         # train for one epoch
-        train_acc1, train_acc5 = train(train_loader, model, criterion, optimizer, epoch, args)
+        train_acc1, train_acc5 = train(train_loader, val_loader, model, criterion, optimizer, epoch, args, a_index)
 
         # evaluate on validation set
         acc1, acc5 = validate(val_loader, model, criterion, args)
@@ -357,7 +386,7 @@ def main_worker(gpu, ngpus_per_node, args):
             }, is_best, filename='checkpoint_e{}.pth.tar'.format(epoch+1))
 
 
-def train(train_loader, model, criterion, optimizer, epoch, args):
+def train(train_loader, val_loader, model, criterion, optimizer, epoch, args, a_index):
     batch_time = AverageMeter('Time', ':6.3f')
     data_time = AverageMeter('Data', ':6.3f')
     losses = AverageMeter('Loss', ':.4e')
@@ -372,15 +401,31 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
         print("Num batches {}  Total saves per checkpoint {} Save Every {}".format(
             num_batches, args.inner_save, save_every))
 
+    # if args.sel_count: 
+    #     num_cal = num_batches // args.sel_count 
+    #     print(f"Num batches {num_batches}, Num of calculations: {args.sel_count}, Calculate every {num_cal}")
+
     progress = ProgressMeter(
         num_batches,
         [batch_time, data_time, losses, top1, top5],
         prefix="Epoch: [{}]".format(epoch))
 
+    
+    if epoch == 0: 
+        torch.save(model.module.layer4, EXP_DIR / f'module7_e{epoch}.pt')
+    if epoch == 4: 
+        model.module.layer4 = torch.load(EXP_DIR / f'module7_e0.pt')
+
+
     # switch to train mode
     model.train()
+    epsilon = 1e-6
 
+    
     end = time.time()
+
+  
+
     for i, (images, target) in enumerate(train_loader):
         # measure data loading time
         data_time.update(time.time() - end)
@@ -390,9 +435,80 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
         if torch.cuda.is_available():
             target = target.cuda(args.gpu, non_blocking=True)
 
+        # # get class selectivity
+        # cs_dict_path = LOAD_DIR / 'cs_dict_val_cp{}'.format(args.start_cp)
+        # class_selectivity = utils.load_file(cs_dict_path)
+
         # compute output
-        output = model(images)
-        loss = criterion(output, target)
+        # output = model(images)
+        # if i % num_cal == 0:
+        #     class_selectivity, class_activations = get_class_selectivity(model=model, val_loader=val_loader) 
+
+        # output = model(images)
+     
+        resnet_layers = nn.Sequential(*list(model.module.children()))
+        output = torch.clone(images).to('cuda')
+
+        class_activations = {
+        4: {},
+        5: {},
+        6: {},
+        7: {}
+        }
+
+        class_selectivity = {
+            4: {},
+            5: {},
+            6: {},
+            7: {}
+        }
+
+        for index, layer in enumerate(resnet_layers):
+            output, class_activations = get_selectivity_grad(index, layer, class_activations, output, target) 
+        
+        # Layer_k = outer layer num, layer_v = dict of the form {class_i: {} ... } 
+        for layer_k, layer_v in class_activations.items():
+            # for class_k, class_v in class_activations[layer_k].items():
+            # For a layer, the number of bottleneck layers will be the same 
+            # So, just choose any class to get the index of bottleneck layers 
+            random_key = target[0].item()
+
+            for bottleneck_k, bottleneck_v in class_activations[layer_k][random_key].items():
+                for ci, class_k in enumerate(sorted(class_activations[layer_k].keys())):
+                    if ci > 0:
+                        all_activations_for_this_bottleneck = torch.cat((all_activations_for_this_bottleneck, class_activations[layer_k][class_k][bottleneck_k]), dim=0)
+                    else:
+                        all_activations_for_this_bottleneck = class_activations[layer_k][class_k][bottleneck_k]
+                
+                all_activations_for_this_bottleneck = all_activations_for_this_bottleneck.t()
+
+                u_max, u_max_indices = torch.max(all_activations_for_this_bottleneck, dim=1)
+                u_sum = torch.sum(all_activations_for_this_bottleneck, dim=1)
+                u_minus_max = (u_sum - u_max) / (all_activations_for_this_bottleneck.shape[1] - 1)
+
+                selectivity = (u_max - u_minus_max) / (u_max + u_minus_max + epsilon)
+                
+                class_selectivity[layer_k].update({bottleneck_k: selectivity})
+    
+    
+        layer_selectivity = []
+        for layer_k, layer_v in class_selectivity.items():
+            unit_selectivity = []
+            if args.ignore_last and layer_k != 7: 
+                for bottleneck_k, bottleneck_v in class_selectivity[layer_k].items():
+                    unit_selectivity += class_selectivity[layer_k][bottleneck_k]
+                avg_unit_selectivity = sum(unit_selectivity) / len(unit_selectivity)
+                layer_selectivity.append(avg_unit_selectivity)
+            elif not args.ignore_last:
+                for bottleneck_k, bottleneck_v in class_selectivity[layer_k].items():
+                    unit_selectivity += class_selectivity[layer_k][bottleneck_k]
+                avg_unit_selectivity = sum(unit_selectivity) / len(unit_selectivity)
+                layer_selectivity.append(avg_unit_selectivity)
+
+        regularization_term = sum(layer_selectivity) / len(layer_selectivity)
+
+        alpha = args.alphas[a_index]
+        loss = criterion(output, target) - alpha*regularization_term
 
         # measure accuracy and record loss
         acc1, acc5 = accuracy(output, target, topk=(1, 5))

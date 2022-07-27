@@ -240,9 +240,9 @@ if not args.cd:
                     SAVE_DIR = EXP_DIR / 'k.{}'.format(k) / '{}.{}'.format(class_k, categories[class_k])
                     SAVE_DIR.mkdir(parents=True, exist_ok=True)
                     hm = sns.heatmap(df.corr())
-                    hm.set(title="CP {} all layers for {}".format(cp, categories[class_k]))
+                    hm.set(title="CP {} all modules for {}".format(cp, categories[class_k]))
                     
-                    SAVE_PATH = SAVE_DIR / 'cp{}_all_layers.jpg'.format(cp)
+                    SAVE_PATH = SAVE_DIR / 'cp{}_all_modules.jpg'.format(cp)
                     
                     plt.savefig(SAVE_PATH)
                     plt.clf()
@@ -268,9 +268,9 @@ if not args.cd:
                     corr_dict[k][(li, lj)][class_k].append(np.nanmean(corr_mat))
                     if args.plot_mat:
                         hm_sliced = sns.heatmap(df_corr, annot=True)
-                        hm_sliced.set(title="CP {} Layers {} - {} for {}".format(cp, li, lj, categories[class_k]))
+                        hm_sliced.set(title="CP {} Modules {} - {} for {}".format(cp, li, lj, categories[class_k]))
                         
-                        SAVE_PATH = SAVE_DIR / 'cp{}_layers_{}_{}.jpg'.format(cp, li, lj)
+                        SAVE_PATH = SAVE_DIR / 'cp{}_modules_{}_{}.jpg'.format(cp, li, lj)
                         
                         plt.savefig(SAVE_PATH)
                         plt.clf()
@@ -294,14 +294,14 @@ for k, v in corr_dict.items():
     for (li, lj), class_dict, in v.items():
         fig1, ax1 = plt.subplots()
         ax1.set_prop_cycle('color', colors)
-        ax1.set_xlabel('Checkpoints')
+        ax1.set_xlabel('Epochs')
         ax1.set_ylabel('Mean correlation')
-        ax1.set_title(f'Layer {li}-{lj} k{k}')
+        ax1.set_title(f'Module {li}-{lj} k{k}')
 
         for class_k, means in class_dict.items(): 
             ax1.plot(checkpoints, means, label='Class {}'.format(class_k))
         
-        fig1.savefig(SAVE_DIR / 'Layer_{}_{}_Mean_Corr.png'.format(li, lj))
+        fig1.savefig(SAVE_DIR / 'Module_{}_{}_Mean_Corr.png'.format(li, lj))
         ax1.clear()
         plt.close(fig1)
 
@@ -327,20 +327,28 @@ for k, v in corr_dict.items():
 
         plt.plot(checkpoints, final_means, 'b-', label='Mean of all classes')
         plt.fill_between(checkpoints, final_means - stds, final_means + stds, color='b', alpha=0.2)
-        plt.xlabel('Checkpoints')
+        plt.xlabel('Epochs')
         plt.ylabel('Mean Correlation')
-        plt.title(f'Layer {li}-{lj} k{k}')
+        if not args.ran: 
+            plt.title(f'Correlation between class selective neurons (k={k}) of module {li}-{lj}')
+        else: 
+            plt.title(f'Correlation between random neurons (k={k}) of module {li}-{lj}')
+
+
         plt.legend()
-        plt.savefig(EXP_DIR / f'Error_K{k}_Layer_{li}_{lj}.jpg')
+        plt.savefig(EXP_DIR / f'Error_K{k}_Module_{li}_{lj}.jpg')
         plt.clf()
 
         plt.plot(checkpoints, final_means, 'b-', label='Mean of all classes')
         plt.fill_between(checkpoints, final_means - confidence_intervals, final_means + confidence_intervals, color='b', alpha=0.2)
-        plt.xlabel('Checkpoints')
+        plt.xlabel('Epochs')
         plt.ylabel('Mean Correlation')
-        plt.title(f'Layer {li}-{lj} k{k}')
+        if not args.ran: 
+            plt.title(f'Correlation between class selective neurons (k={k}) of module {li}-{lj}')
+        else: 
+            plt.title(f'Correlation between random neurons (k={k}) of module {li}-{lj}')
         plt.legend()
-        plt.savefig(EXP_DIR / f'Confidence_Interval_K{k}_Layer_{li}_{lj}.jpg')
+        plt.savefig(EXP_DIR / f'Confidence_Interval_K{k}_Module_{li}_{lj}.png')
         plt.clf()
 
 

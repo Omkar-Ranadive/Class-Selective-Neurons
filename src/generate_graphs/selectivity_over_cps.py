@@ -67,7 +67,7 @@ for l, c in channels.items():
     number_of_plots = c
     
     ax1.set_title(f'Module {l} Class Selectivity Index')
-    ax1.set_xlabel('Checkpoints')
+    ax1.set_xlabel('Epochs')
     ax1.set_ylabel('Class Selectivity Index')
     ax1.xaxis.set_major_locator(plt.MaxNLocator(10))
     ax1.xaxis.set_minor_locator(plt.MultipleLocator(1))
@@ -75,7 +75,7 @@ for l, c in channels.items():
     ax1.tick_params(which='both', top=False, right=False)
 
     ax2.set_title(f'Class Selectivity Index across all modules')
-    ax2.set_xlabel('Checkpoints')
+    ax2.set_xlabel('Epochs')
     ax2.set_ylabel('Class Selectivity Index')
     ax2.xaxis.set_major_locator(plt.MaxNLocator(10))
     ax2.xaxis.set_minor_locator(plt.MultipleLocator(1))
