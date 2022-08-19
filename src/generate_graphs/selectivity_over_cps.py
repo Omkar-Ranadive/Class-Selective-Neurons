@@ -123,10 +123,12 @@ for l, c in channels.items():
     ax2.fill_between(checkpoints_to_load, means - confidence_intervals, means + confidence_intervals,  alpha=0.3)
     ax2.legend(loc='upper right')
           
-    fig1.savefig(SAVE_DIR / f'l{l}_cp{args.check_min}_to_cp{args.check_max}.png')
+    fig1.savefig(SAVE_DIR / f'{args.data_dir}_l{l}_cp{args.check_min}_to_cp{args.check_max}.png')
+
     ax1.clear()
 
-fig2.savefig(SAVE_DIR / f'All_Modules_cp{args.check_min}_to_cp{args.check_max}.png')
+fig2.savefig(SAVE_DIR / f'{args.data_dir}_All_Modules_cp{args.check_min}_to_cp{args.check_max}.png')
+
 ax2.clear()
 
 

@@ -23,6 +23,8 @@ parser.add_argument("--batch_size", default=512, type=int)
 parser.add_argument("--loader", default='val', type=str)
 parser.add_argument("--check_min", default=None, type=int)
 parser.add_argument("--check_max", default=None, type=int)
+parser.add_argument("--save_plots", action='store_true', help='If True, plots for each layer and checkpoint are saved')
+
 args = parser.parse_args()
 
 
@@ -128,16 +130,17 @@ for cp in checkpoints_to_load:
             t1_acc.append(t1.item()) 
             t5_acc.append(t5.item()) 
 
-        # For the current layer, plot num channels vs accuracy and save the plot 
-        plt.xlabel('Channels ablated')
-        plt.ylabel('Accuracy')
+        if args.save_plots:
+            # For the current layer, plot num channels vs accuracy and save the plot 
+            plt.xlabel('Channels ablated')
+            plt.ylabel('Accuracy')
 
-        plt.plot(X, t1_acc, label='Top 1 Acc')
-        plt.plot(X, t5_acc, label='Top 5 Acc')
-        plt.title('Layer {}'.format(layer))
-        plt.legend()
-        plt.savefig(str(EXP_DIR / 'cp{}_layer_{}.png'.format(cp, layer)))
-        plt.clf()
+            plt.plot(X, t1_acc, label='Top 1 Acc')
+            plt.plot(X, t5_acc, label='Top 5 Acc')
+            plt.title('Layer {}'.format(layer))
+            plt.legend()
+            plt.savefig(str(EXP_DIR / 'cp{}_layer_{}.png'.format(cp, layer)))
+            plt.clf()
 
         # Save data for future use 
         np.save(EXP_DIR / 't1_acc_cp{}_layer_{}'.format(cp, layer), t1_acc) 

@@ -16,11 +16,13 @@ import numpy as np
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--exp_name", type=str, required=True)
+parser.add_argument("--data_dir", type=str, required=True)
 parser.add_argument("--num_workers", default=8, type=int)
 parser.add_argument("--batch_size", default=512, type=int)
 parser.add_argument("--loader", default='val', type=str)
-parser.add_argument("--check_min", required=True, type=int)
-parser.add_argument("--check_max", required=True, type=int)
+parser.add_argument("--check_min", required=None, type=int)
+parser.add_argument("--check_max", required=None, type=int)
+parser.add_argument("--save_plots", action='store_true', help='If True, plots for each layer and checkpoint are saved')
 args = parser.parse_args()
 
 
@@ -42,6 +44,9 @@ EXP_DIR = EXP_PATH / args.exp_name
 if not os.path.isdir(EXP_DIR): 
     os.mkdir(EXP_DIR) 
 
+DATA_DIR = DATA_PATH / args.data_dir
+
+
 # Setup logger 
 logging.basicConfig(level=logging.INFO, filename=str(EXP_DIR / 'info.log'), format='%(asctime)s %(message)s')
 logger=logging.getLogger() 
@@ -62,7 +67,14 @@ loader =  utils.load_imagenet_data(dir=dir, batch_size=args.batch_size, num_work
 # Max number of channels to ablate based on the layer number (this is based on the model structure)
 channels = {4: 256, 5: 512, 6: 1024, 7: 2048}
 
-checkpoints_to_load = [i for i in range(args.check_min, args.check_max)]
+if args.check_min and args.check_max:
+    checkpoints_to_load = [i for i in range(args.check_min, args.check_max+1)]
+else: 
+    # Load all of the first 15 checkpoints as selectivity is more prominent in the earlier epochs 
+    checkpoints_to_load = [i for i in range(1, 16)]
+    # Then load remaining checkpoints with step of 10
+    checkpoints_to_load.extend(list(range(20, 91, 10)))
+
 
 # Load pre-trained Resnet 
 model = models.resnet50()
@@ -70,7 +82,7 @@ model_dict = model.state_dict()
 
 
 for cp in checkpoints_to_load: 
-    checkpoint = torch.load(DATA_PATH / 'model_checkpoints' / 'CHECKPOINTS' / 'EXPE1' / 'checkpoint_epoch{}.pth.tar'.format(cp))
+    checkpoint = torch.load(DATA_DIR / f'checkpoint_e{cp}.pth.tar')
 
     # Load checkpoint state dict into the model 
     """
@@ -90,7 +102,11 @@ for cp in checkpoints_to_load:
         ablate_dict = {layer: [0, 1, 2, 3, 4, 5]}
         t1_acc = []
         t5_acc = []
-        X = list(range(0, channels[layer]+1, 10)) # Stepping the channels to speed it up 
+        first_half = channels[layer]//2 
+        X1 = list(range(0, first_half, 15))
+        X2 = list(range(first_half, channels[layer]+1, 40)) 
+        X = X1 + X2 
+        # X = list(range(0, channels[layer]+1, 10)) # Stepping the channels to speed it up 
         
         for nc in X: 
             t1, t5 = validate(val_loader=loader, model=model, criterion=criterion, ablate_dict=ablate_dict, num_channels=nc, class_selectivity=None)
@@ -98,16 +114,17 @@ for cp in checkpoints_to_load:
             t1_acc.append(t1.item()) 
             t5_acc.append(t5.item()) 
 
-        # For the current layer, plot num channels vs accuracy and save the plot 
-        plt.xlabel('Channels ablated')
-        plt.ylabel('Accuracy')
+        if args.save_plots:
+            # For the current layer, plot num channels vs accuracy and save the plot 
+            plt.xlabel('Channels ablated')
+            plt.ylabel('Accuracy')
 
-        plt.plot(X, t1_acc, label='Top 1 Acc')
-        plt.plot(X, t5_acc, label='Top 5 Acc')
-        plt.title('Layer {}'.format(layer))
-        plt.legend()
-        plt.savefig(str(EXP_DIR / '{}_cp{}_layer_{}.png'.format(datetime.now().strftime('%m_%d_%Y-%H_%M_%S'), cp, layer)))
-        plt.clf()
+            plt.plot(X, t1_acc, label='Top 1 Acc')
+            plt.plot(X, t5_acc, label='Top 5 Acc')
+            plt.title('Layer {}'.format(layer))
+            plt.legend()
+            plt.savefig(str(EXP_DIR / 'cp{}_layer_{}.png'.format(cp, layer)))
+            plt.clf()
 
         # Save data for future use 
         np.save(EXP_DIR / 't1_acc_cp{}_layer_{}'.format(cp, layer), t1_acc) 

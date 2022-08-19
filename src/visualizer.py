@@ -188,7 +188,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--exp_name_ran", default="dummy_ran", type=str)
     parser.add_argument("--exp_name_cs", default="dummy_cs", type=str)
-    parser.add_argument("--vis", default="nor", type=str)
+    parser.add_argument("--vis", default="compcp", type=str)
     parser.add_argument("--check_min", type=int, default=None)
     parser.add_argument("--check_max", type=int, default=None)
     parser.add_argument("--save_dir", default=None, type=str)

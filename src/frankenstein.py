@@ -95,7 +95,8 @@ parser.add_argument('--save_batch_targets', action='store_true', help='Save batc
 parser.add_argument("--use_ws", action='store_true', help='If true, weighted sampler is used')
 # parser.add_argument("--alpha", required=True, type=float)
 parser.add_argument("--ignore_last", action='store_true', help='If true, dont regularizer the last layer for selectivity')
-
+parser.add_argument('--save_frank', required=True, type=int, help='Epoch at which model dict is saved') 
+parser.add_argument('--load_frank', required=True, type=int, help='Epoch at which model dict is loaded')
 
 best_acc1 = 0
 best_acc5 = 0 
@@ -136,6 +137,7 @@ def main():
     logger.info(f'Alphas: {args.alphas}')
     logger.info(f'Start Epoch: {args.resume}')
     logger.info(f'Ignoring selectivity regularization for module 7: {args.ignore_last}')
+    logger.info(f'Save Frank {args.save_frank}  Load Frank {args.load_frank}')
     # logger.info(f'Selectivity calculated {args.sel_count} per epoch')
 
     if args.seed is not None:
@@ -357,6 +359,18 @@ def main_worker(gpu, ngpus_per_node, args):
             train_sampler.set_epoch(epoch)
         adjust_learning_rate(optimizer, epoch, args)
 
+
+        if epoch == args.save_frank: 
+            torch.save(model.state_dict(), EXP_DIR / f'model_e{args.save_frank}.pt')
+        if epoch == args.load_frank: 
+            old_dict = torch.load(EXP_DIR / f'model_e{args.save_frank}.pt')
+            cur_dict = model.state_dict() 
+            for k, v in old_dict.items(): 
+                if 'layer4' not in k: 
+                    old_dict[k] = cur_dict[k] 
+            
+            model.load_state_dict(old_dict)
+
         # train for one epoch
         train_acc1, train_acc5 = train(train_loader, val_loader, model, criterion, optimizer, epoch, args, a_index)
 
@@ -409,12 +423,6 @@ def train(train_loader, val_loader, model, criterion, optimizer, epoch, args, a_
         num_batches,
         [batch_time, data_time, losses, top1, top5],
         prefix="Epoch: [{}]".format(epoch))
-
-    
-    if epoch == 0: 
-        torch.save(model.module.layer4, EXP_DIR / f'module7_e{epoch}.pt')
-    if epoch == 4: 
-        model.module.layer4 = torch.load(EXP_DIR / f'module7_e0.pt')
 
 
     # switch to train mode
