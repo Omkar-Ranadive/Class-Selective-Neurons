@@ -34,3 +34,4 @@ MANIFEST
 # List of .py files to ignore
 src/scratch.py
 src/val_script.sh
+src/scratch2.py

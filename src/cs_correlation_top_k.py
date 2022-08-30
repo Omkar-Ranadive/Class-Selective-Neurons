@@ -83,8 +83,7 @@ def forward(model, input_batch, target, class_activations):
                 if isinstance(child, Bottleneck): 
                     input_batch = bottleneck_layer(input_batch, child)
                     activations = torch.mean(input_batch.view(input_batch.size(0), input_batch.size(1), -1), dim=2)
-
-                    # print(activations.shape)
+                    # Output after reshaping - [batch_size, bottlneck_size], example (512, 256)
                     # exit()
 
                     for i, activation in enumerate(activations): 
@@ -161,13 +160,11 @@ def get_class_activations(model, val_loader):
     
     return class_activations
 
-# Nikhil (02/26/2022): Hardcoding checkpoint numbers for now.
-# I want plots for start, middle, and end of training.
-# for cp in range(args.check_num, args.check_num+1):
-
-checkpoints = range(1, 90, 4)  # Step by 4 
-checkpoints = [0] + list(checkpoints)
+# checkpoints = range(1, 90, 4)  # Step by 4 
+# checkpoints = [0] + list(checkpoints)
 # checkpoints = [1, 45, 89]
+checkpoints = [i for i in range(0, 21)]
+
 
 if not args.cd: 
     corr_dict = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
@@ -205,21 +202,22 @@ if not args.cd:
                 for bottleneck_k, bottleneck_v in class_activations[layer_k][class_k].items():
                     for k in range(1, args.k+1):
                         if not args.ran: 
+                            # Size of this is (50, k) where 50 is total num of examples per class in validation set  
                             k_activations_for_this_bottleneck, _ = torch.topk(class_activations[layer_k][class_k][bottleneck_k], k=k)
                         else: 
                             indices = np.random.randint(low=0, high=class_activations[layer_k][class_k][bottleneck_k].shape[1], size=k)
                             k_activations_for_this_bottleneck = class_activations[layer_k][class_k][bottleneck_k][:, indices]
 
+                        # The activations are then averaged across k. So for k=3, (50, 3) becomes (50, ).
+                        # So, there will be activation values per class example for each bottleneck layer. 
+                        # Example -  for layer 4, if bottleneck layers = 3, then we have a vector of (50, ) for 3 bottleneck layers.  
                         act_vals[k][class_k][layer_k].append(torch.mean(k_activations_for_this_bottleneck, dim=1).numpy())
+                        # print("Shape after taking mean: ",  act_vals[k][class_k][layer_k][-1].shape)
 
+            # print(f"Act vals length for layer{layer_k} and k{k}: {len(act_vals[k][class_k][layer_k])}")
+        
         print("Activation values calculated...")
         print("Time taken: {}".format(time.time() - start))
-
-
-        """
-        Form a dataframe from the dict 
-        Each column is length 1000 of the form lk_bi for k = layer num and i = bottleneck num 
-        """
 
         print("Plotting...")
 
@@ -228,6 +226,7 @@ if not args.cd:
                 df = pd.DataFrame()
                 for layer, bns in sorted(act_vals[k][class_k].items()):
                     for i, bn_val in enumerate(bns): 
+                        # print(f"Class {class_k} Layer {layer} Bottleneck {i} bnval {bn_val.shape}")
                         df["l{}_b{}".format(layer, i)] = bn_val 
                 
                 # df_dict[k][class_k] = df
@@ -257,15 +256,21 @@ if not args.cd:
 
                     # df_sliced = df_dict[k][class_k][cols_i + cols_j]
                     df_sliced = df[cols_i + cols_j]
-
+                    # print("*"*20)
+                    # print(f"Shape of dataframe for layers {li} - {lj}, {df_sliced.shape}")
+                    # print(df_sliced)
                     # Plot for the sliced frame 
                     df_corr = df_sliced.corr()
-
+                    # print("*"*20)
+                    # print("Correlation between the columns: ")
+                    # print(df_corr.shape)
+                    # print(df_corr)
                     # Take mean of abs correlation values between layer i and layer j 
                     corr_mat = np.abs(df_corr.loc[cols_i, cols_j].to_numpy())
                     # Save it in corr dict. Format:  Layer tuple -> Class Num -> list of mean values for each checkpoint 
                     # Take nan mean as if std = 0, then corr for that pair will be Nan 
                     corr_dict[k][(li, lj)][class_k].append(np.nanmean(corr_mat))
+                    # print("Final class mean", corr_dict[k][(li, lj)][class_k])
                     if args.plot_mat:
                         hm_sliced = sns.heatmap(df_corr, annot=True)
                         hm_sliced.set(title="CP {} Modules {} - {} for {}".format(cp, li, lj, categories[class_k]))
