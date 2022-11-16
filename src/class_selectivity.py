@@ -9,6 +9,7 @@ from torchvision.models.resnet import resnet50
 from constants import DATA_PATH, IMGNET_PATH
 import numpy as np 
 from torchvision.models.resnet import Bottleneck as Bottleneck
+from torchvision.models.resnet import BasicBlock as BasicBlock
 import utils 
 import time
 from tqdm import tqdm
@@ -29,10 +30,10 @@ def forward(model, input_batch, target, class_activations):
         
         # If the present layer is sequential, go deeper 
         if isinstance(layer, torch.nn.modules.container.Sequential):
-            
             for num, child in enumerate(layer.children()): 
-                if isinstance(child, Bottleneck): 
-                    input_batch = bottleneck_layer(input_batch, child)
+                if isinstance(child, Bottleneck) or isinstance(child, BasicBlock):
+
+                    input_batch = bottleneck_layer(input_batch, child) if isinstance(child, Bottleneck) else basic_layer(input_batch, child)
                     activations = torch.mean(input_batch.view(input_batch.size(0), input_batch.size(1), -1), dim=2)
 
                     for i, activation in enumerate(activations): 
@@ -93,6 +94,24 @@ def bottleneck_layer(input_batch, child):
 
     return out
 
+
+def basic_layer(input_batch, child):
+    identity = input_batch
+
+    out = child.conv1(input_batch)
+    out = child.bn1(out)
+    out = child.relu(out)
+
+    out = child.conv2(out)
+    out = child.bn2(out)
+
+    if child.downsample is not None:
+        identity = child.downsample(input_batch)
+
+    out += identity
+    out = child.relu(out)
+
+    return out
 
 def get_class_activations(model, val_loader):
     # switch to evaluate mode
@@ -217,7 +236,11 @@ def calculate_selectivity_subcp(data_dir, loader, check_min, check_max):
     dir = IMGNET_PATH / loader
 
     # Load pre-trained Resnet 
-    model = models.resnet50()
+    if args.arc == 'resnet50':
+        model = models.resnet50()
+    elif args.arc == 'resnet18': 
+        model = models.resnet18()
+
     model_dict = model.state_dict() 
 
     loader_cp = utils.load_imagenet_data(dir=dir, batch_size=256, num_workers=8)
@@ -261,6 +284,7 @@ if __name__ == '__main__':
     parser.add_argument("--data_dir", type=str, required=True)
     parser.add_argument("--img_dir", type=str, default=IMGNET_PATH)
     parser.add_argument("--loader", default='val', type=str)
+    parser.add_argument("--arc", default='resnet50', type=str)
     parser.add_argument("--check_min", type=int, default=0)
     parser.add_argument("--check_max", type=int, default=90)
     parser.add_argument("--sub", action='store_true', help="Use this for sub-checkpointing scenario")
@@ -272,4 +296,6 @@ if __name__ == '__main__':
         calculate_selectivity(data_dir, args.loader, args.check_min, args.check_max)
     else: 
         calculate_selectivity_subcp(data_dir, args.loader, args.check_min, args.check_max)
+
+  
 

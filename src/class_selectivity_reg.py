@@ -9,6 +9,7 @@ from torchvision.models.resnet import resnet50
 from constants import DATA_PATH, IMGNET_PATH
 import numpy as np 
 from torchvision.models.resnet import Bottleneck as Bottleneck
+from torchvision.models.resnet import BasicBlock as BasicBlock
 import utils 
 import time
 from tqdm import tqdm
@@ -32,8 +33,8 @@ def forward(model, input_batch, target, class_activations):
         if isinstance(layer, torch.nn.modules.container.Sequential):
             
             for num, child in enumerate(layer.children()): 
-                if isinstance(child, Bottleneck): 
-                    input_batch = bottleneck_layer(input_batch, child)
+                if isinstance(child, Bottleneck) or isinstance(child, BasicBlock):
+                    input_batch = bottleneck_layer(input_batch, child) if isinstance(child, Bottleneck) else basic_layer(input_batch, child)
                     activations = torch.mean(input_batch.view(input_batch.size(0), input_batch.size(1), -1), dim=2)
 
                     for i, activation in enumerate(activations): 
@@ -91,6 +92,25 @@ def bottleneck_layer(input_batch, child):
 
     # if ablate: 
     #     out = zero_out_activation(out, num_channels)
+
+    return out
+
+
+def basic_layer(input_batch, child):
+    identity = input_batch
+
+    out = child.conv1(input_batch)
+    out = child.bn1(out)
+    out = child.relu(out)
+
+    out = child.conv2(out)
+    out = child.bn2(out)
+
+    if child.downsample is not None:
+        identity = child.downsample(input_batch)
+
+    out += identity
+    out = child.relu(out)
 
     return out
 
@@ -182,8 +202,8 @@ def get_selectivity_grad(index, layer, class_activations, input_batch, target):
     # If the present layer is sequential, go deeper 
     if isinstance(layer, torch.nn.modules.container.Sequential):
         for num, child in enumerate(layer.children()): 
-            if isinstance(child, Bottleneck): 
-                input_batch = bottleneck_layer(input_batch, child)
+            if isinstance(child, Bottleneck) or isinstance(child, BasicBlock):
+                input_batch = bottleneck_layer(input_batch, child) if isinstance(child, Bottleneck) else basic_layer(input_batch, child)
                 activations = torch.mean(input_batch.view(input_batch.size(0), input_batch.size(1), -1), dim=2)
 
                 for i, activation in enumerate(activations): 
