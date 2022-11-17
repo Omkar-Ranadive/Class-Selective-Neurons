@@ -200,7 +200,13 @@ def calculate_selectivity(data_dir, loader, check_min, check_max):
     dir = IMGNET_PATH / loader
 
     # Load pre-trained Resnet 
-    model = models.resnet50()
+    if args.arc == 'resnet50':
+        model = models.resnet50()
+    elif args.arc == 'resnet18': 
+        model = models.resnet18()
+    elif args.arc == 'resnet34': 
+        model = models.resnet34()
+
     model_dict = model.state_dict() 
 
     loader_cp = utils.load_imagenet_data(dir=dir, batch_size=256, num_workers=8)
@@ -240,7 +246,9 @@ def calculate_selectivity_subcp(data_dir, loader, check_min, check_max):
         model = models.resnet50()
     elif args.arc == 'resnet18': 
         model = models.resnet18()
-
+    elif args.arc == 'resnet34': 
+        model = models.resnet34()
+        
     model_dict = model.state_dict() 
 
     loader_cp = utils.load_imagenet_data(dir=dir, batch_size=256, num_workers=8)
@@ -253,29 +261,29 @@ def calculate_selectivity_subcp(data_dir, loader, check_min, check_max):
             print(f"Calculating class selctivity for file {f}")
             batch_num = re.search('b\d+', f).group()
             cp = re.search('e\d+', f).group()[1:]
+            if check_min < int(cp) <= check_max: 
+                cs_dict_path = data_dir / f'cs_dict_{loader}_cp{cp}_{batch_num}'
 
-            cs_dict_path = data_dir / f'cs_dict_{loader}_cp{cp}_{batch_num}'
+                checkpoint = torch.load(data_dir / f'checkpoint_e{cp}_{batch_num}.pth.tar')
 
-            checkpoint = torch.load(data_dir / f'checkpoint_e{cp}_{batch_num}.pth.tar')
+                # Load checkpoint state dict into the model 
+                """
+                The key values in checkpoint have different key names, they have an additional "module." in their name 
+                Therefore, cleaning the keys before updating state dict of the model 
+                """
 
-            # Load checkpoint state dict into the model 
-            """
-            The key values in checkpoint have different key names, they have an additional "module." in their name 
-            Therefore, cleaning the keys before updating state dict of the model 
-            """
+                for key in checkpoint['state_dict'].keys(): 
+                    model_key = key.replace("module.", "")
+                    model_dict[model_key] = checkpoint['state_dict'][key] 
 
-            for key in checkpoint['state_dict'].keys(): 
-                model_key = key.replace("module.", "")
-                model_dict[model_key] = checkpoint['state_dict'][key] 
+                model.load_state_dict(model_dict)
+                model.eval()
+                
 
-            model.load_state_dict(model_dict)
-            model.eval()
-            
-
-            if not cs_dict_path.is_file(): 
-                class_selectivity, class_activations = get_class_selectivity(model=model, val_loader=loader_cp) 
-                utils.save_file(class_selectivity, data_dir / f'cs_dict_{loader}_cp{cp}_{batch_num}')
-                utils.save_file(class_activations, data_dir / f'cs_dict_{loader}_cp{cp}_{batch_num}_full')
+                if not cs_dict_path.is_file(): 
+                    class_selectivity, class_activations = get_class_selectivity(model=model, val_loader=loader_cp) 
+                    utils.save_file(class_selectivity, data_dir / f'cs_dict_{loader}_cp{cp}_{batch_num}')
+                    utils.save_file(class_activations, data_dir / f'cs_dict_{loader}_cp{cp}_{batch_num}_full')
 
 
 if __name__ == '__main__': 
