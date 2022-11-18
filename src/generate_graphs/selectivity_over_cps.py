@@ -22,7 +22,9 @@ parser.add_argument("--loader", default='val', type=str)
 parser.add_argument("--check_min", required=True, type=int)
 parser.add_argument("--check_max", required=True, type=int)
 parser.add_argument("--save_dir", default=None, type=str)
-
+parser.add_argument("--cmap", default='b', type=str)
+parser.add_argument("--arc", default='resnet50', type=str)
+parser.add_argument("--bins", default=10, type=int)
 
 args = parser.parse_args()
 
@@ -42,18 +44,32 @@ if args.data_dir is not None:
 else:
     DATA_DIR = DATA_PATH
 
-channels = {4: 256, 5: 512, 6: 1024, 7: 2048}
+if args.arc == 'resnet50':
+    channels = {4: 256, 5: 512, 6: 1024, 7: 2048}
+elif args.arc == 'resnet18' or args.arc == 'resnet34':
+    channels = {4: 64, 5: 128, 6: 256, 7: 512}
+
 
 checkpoints_to_load = [i for i in range(args.check_min, args.check_max+1)]
 
 cs_for_every_cp = []
 
-sns.set_theme()
+sns.set_theme(style='whitegrid')
+plt.rcParams['savefig.dpi'] = 300
+plt.rcParams['axes.titlesize'] = 'large'
+plt.rcParams['axes.labelsize'] = 'medium'
+
+if args.cmap == 'b': 
+    cmap = plt.get_cmap('Blues')
+elif args.cmap == 'or': 
+    cmap = plt.get_cmap('OrRd')
+
 fig1, ax1 = plt.subplots()
 fig2, ax2 = plt.subplots()
 
-ax1.clear()
-ax2.clear()
+colors2 = cmap(np.linspace(0.45, 1.0, len(channels.keys()))) 
+ax2.set_prop_cycle('color', colors2)
+
 
 for cp in checkpoints_to_load:
     cs_dict_path = DATA_DIR / 'cs_dict_{}_cp{}'.format(args.loader, cp)
@@ -69,7 +85,7 @@ for l, c in channels.items():
     ax1.set_title(f'Module {l} Class Selectivity Index')
     ax1.set_xlabel('Epochs')
     ax1.set_ylabel('Class Selectivity Index')
-    ax1.xaxis.set_major_locator(plt.MaxNLocator(10))
+    ax1.xaxis.set_major_locator(plt.MaxNLocator(nbins=args.bins, integer=True))
     ax1.xaxis.set_minor_locator(plt.MultipleLocator(1))
     ax1.tick_params(axis='x', which='minor', length=3, color='r', direction='out')
     ax1.tick_params(which='both', top=False, right=False)
@@ -77,7 +93,7 @@ for l, c in channels.items():
     ax2.set_title(f'Class Selectivity Index across all modules')
     ax2.set_xlabel('Epochs')
     ax2.set_ylabel('Class Selectivity Index')
-    ax2.xaxis.set_major_locator(plt.MaxNLocator(10))
+    ax2.xaxis.set_major_locator(plt.MaxNLocator(nbins=args.bins, integer=True))
     ax2.xaxis.set_minor_locator(plt.MultipleLocator(1))
     ax2.tick_params(axis='x', which='minor', length=3, color='r', direction='out')
     ax2.tick_params(which='both', top=False, right=False)
@@ -87,7 +103,10 @@ for l, c in channels.items():
 
     module_level_means = []
     module_level_stds = []
-    for b in cs_for_every_cp[0][l].keys():
+    bkeys = cs_for_every_cp[0][l].keys()
+    colors1 = cmap(np.linspace(0.45, 1.0, len(bkeys))) 
+    ax1.set_prop_cycle('color', colors1)
+    for b in bkeys:
         BOTTLENECK_LAYER_PATH = LAYER_PATH / "bottleneck_layer_{}".format(b)
         # os.makedirs(BOTTLENECK_LAYER_PATH, exist_ok=True)
       
@@ -123,11 +142,11 @@ for l, c in channels.items():
     ax2.fill_between(checkpoints_to_load, means - confidence_intervals, means + confidence_intervals,  alpha=0.3)
     ax2.legend(loc='upper right')
           
-    fig1.savefig(SAVE_DIR / f'{args.data_dir}_l{l}_cp{args.check_min}_to_cp{args.check_max}.png')
+    fig1.savefig(SAVE_DIR / f'{args.data_dir}_l{l}_cp{args.check_min}_to_cp{args.check_max}.pdf', format='pdf')
 
     ax1.clear()
 
-fig2.savefig(SAVE_DIR / f'{args.data_dir}_All_Modules_cp{args.check_min}_to_cp{args.check_max}.png')
+fig2.savefig(SAVE_DIR / f'{args.data_dir}_All_Modules_cp{args.check_min}_to_cp{args.check_max}.pdf', format='pdf')
 
 ax2.clear()
 

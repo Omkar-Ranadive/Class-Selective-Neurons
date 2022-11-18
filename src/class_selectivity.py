@@ -248,7 +248,7 @@ def calculate_selectivity_subcp(data_dir, loader, check_min, check_max):
         model = models.resnet18()
     elif args.arc == 'resnet34': 
         model = models.resnet34()
-        
+
     model_dict = model.state_dict() 
 
     loader_cp = utils.load_imagenet_data(dir=dir, batch_size=256, num_workers=8)
@@ -261,7 +261,7 @@ def calculate_selectivity_subcp(data_dir, loader, check_min, check_max):
             print(f"Calculating class selctivity for file {f}")
             batch_num = re.search('b\d+', f).group()
             cp = re.search('e\d+', f).group()[1:]
-            if check_min < int(cp) <= check_max: 
+            if check_min <= int(cp) <= check_max: 
                 cs_dict_path = data_dir / f'cs_dict_{loader}_cp{cp}_{batch_num}'
 
                 checkpoint = torch.load(data_dir / f'checkpoint_e{cp}_{batch_num}.pth.tar')
