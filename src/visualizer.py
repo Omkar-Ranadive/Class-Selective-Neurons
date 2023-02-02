@@ -172,13 +172,13 @@ def compare_cp_acc(dirs, key):
         plt.plot(range(0, len(accs)), accs, label='{}'.format(dir), alpha=0.8)
     
     plt.title(f"{key}")
-    plt.xlabel('Checkpoints')
+    plt.xlabel('Epochs')
     plt.ylabel('Accuracy')
     plt.legend()
     if args.check_min is None and args.check_max is None: 
-        plt.savefig(SAVE_DIR / f'cp_{key}_com.png')
+        plt.savefig(SAVE_DIR / f'cp_{key}_com.pdf', format='pdf')
     else: 
-        plt.savefig(SAVE_DIR / f'cp_{args.check_min}_to_{args.check_max}_{key}_com.png')
+        plt.savefig(SAVE_DIR / f'cp_{args.check_min}_to_{args.check_max}_{key}_com.pdf', format='pdf')
 
 
  
@@ -197,6 +197,11 @@ if __name__ == '__main__':
     parser.add_argument('-l','--list', nargs='+')
     
     args = parser.parse_args()
+
+    sns.set_theme(style='whitegrid')
+    plt.rcParams['savefig.dpi'] = 300
+    plt.rcParams['axes.titlesize'] = 'large'
+    plt.rcParams['axes.labelsize'] = 'medium'
 
     EXP_DIR_RAN = EXP_PATH / args.exp_name_ran
     EXP_DIR_CS = EXP_PATH / args.exp_name_cs 

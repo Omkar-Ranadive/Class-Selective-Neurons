@@ -288,6 +288,23 @@ def calculate_selectivity_subcp(data_dir, loader, check_min, check_max):
 
 if __name__ == '__main__': 
 
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument("--data_dir", type=str, required=True)
+    # parser.add_argument("--img_dir", type=str, default=IMGNET_PATH)
+    # parser.add_argument("--loader", default='val', type=str)
+    # parser.add_argument("--arc", default='resnet50', type=str)
+    # parser.add_argument("--check_min", type=int, default=0)
+    # parser.add_argument("--check_max", type=int, default=90)
+    # parser.add_argument("--sub", action='store_true', help="Use this for sub-checkpointing scenario")
+    # args = parser.parse_args()
+
+    # data_dir = DATA_PATH / args.data_dir
+
+    # if not args.sub: 
+    #     calculate_selectivity(data_dir, args.loader, args.check_min, args.check_max)
+    # else: 
+    #     calculate_selectivity_subcp(data_dir, args.loader, args.check_min, args.check_max)
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_dir", type=str, required=True)
     parser.add_argument("--img_dir", type=str, default=IMGNET_PATH)
@@ -305,5 +322,4 @@ if __name__ == '__main__':
     else: 
         calculate_selectivity_subcp(data_dir, args.loader, args.check_min, args.check_max)
 
-  
 
