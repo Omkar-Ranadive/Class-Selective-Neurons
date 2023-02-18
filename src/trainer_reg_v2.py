@@ -94,8 +94,12 @@ parser.add_argument('--inner_save', default=None, type=int,
 # parser.add_argument("--sel_count", default=None, type=int, required=True, help="Number of times selectivity is calculated during each epoch")
 parser.add_argument('--save_batch_targets', action='store_true', help='Save batch target labels for each epoch')
 parser.add_argument("--use_ws", action='store_true', help='If true, weighted sampler is used')
-# parser.add_argument("--alpha", required=True, type=float)
-parser.add_argument("--ignore_last", action='store_true', help='If true, dont regularizer the last layer for selectivity')
+parser.add_argument("--alpha", required=True, type=str, help=
+                    """ It should be a expression of the form alpha_val_i * num_epochs alpha_val_2 * num_epochs .....
+                    Example: To run with alpha = 0 for first 5 epochs and then alpha = -20 for next 15 epochs, expression would be: "0*5 -20*15"
+                    (Make sure to quote around the string to avoid parsing errors) 
+                    """)
+parser.add_argument("--ignore_last", default=True, action=argparse.BooleanOptionalAction, help='If true, dont regularizer the last layer for selectivity')
 
 
 best_acc1 = 0
@@ -122,18 +126,23 @@ def main():
     logging.basicConfig(level=logging.INFO, filename=str(EXP_DIR / 'info.log'), format='%(message)s', filemode='a')
     logger = logging.getLogger()
 
-    # Load the alphas (specify the alphas for the expeirment in alphas.txt file)
-    assert (DATA_PATH / 'alphas.txt').exists(), "Create an alphas.txt file to continue. Example: 10, 10, 0, 0 will assign those alphas to epoch 1 to 4 respectively"
-    with open(DATA_PATH / 'alphas.txt', 'r') as f: 
-        alphas = re.split(", ", f.read())
-        args.alphas = list(map(float, alphas))
+    args.alphas = []
+
+    # Find all occurrences of a number followed by "*" and another number
+    matches = re.findall(r'(-?\d+)\s*\*\s*(-?\d+)', args.alpha)
+
+    # Print the matched numbers
+    for match in matches:
+        alpha = float(match[0])
+        multiplier = int(match[1]) 
+        args.alphas.extend([alpha]*multiplier)
 
 
     logger.info(f'Batch size: {args.batch_size}')
     logger.info(f'Training epochs: {args.epochs}')
     logger.info(f'Learning Rate: {args.lr}')
     logger.info(f'Model architecture: {args.arch}')
-    # logger.info(f'Alpha: {args.alpha}')
+    logger.info(f'Alpha: {args.alpha}')
     logger.info(f'Alphas: {args.alphas}')
     logger.info(f'Start Epoch: {args.resume}')
     logger.info(f'Ignoring selectivity regularization for module 7: {args.ignore_last}')
