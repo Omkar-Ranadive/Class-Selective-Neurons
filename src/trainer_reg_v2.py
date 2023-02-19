@@ -96,8 +96,9 @@ parser.add_argument('--save_batch_targets', action='store_true', help='Save batc
 parser.add_argument("--use_ws", action='store_true', help='If true, weighted sampler is used')
 parser.add_argument("--alpha", required=True, type=str, help=
                     """ It should be a expression of the form alpha_val_i * num_epochs alpha_val_2 * num_epochs .....
-                    Example: To run with alpha = 0 for first 5 epochs and then alpha = -20 for next 15 epochs, expression would be: "0*5 -20*15"
-                    (Make sure to quote around the string to avoid parsing errors) 
+                    Example: To run with alpha = 0 for first 5 epochs and then alpha = -20 for next 15 epochs, expression would be: " 0*5 -20*15"
+                    (Make sure to quote around the string to avoid parsing errors. 
+                    If starting with a negative value, for example - " -20*20", make sure to add a space after quote to avoid negative number issues in Linux) 
                     """)
 parser.add_argument("--ignore_last", default=True, action=argparse.BooleanOptionalAction, help='If true, dont regularizer the last layer for selectivity')
 

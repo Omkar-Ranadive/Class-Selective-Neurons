@@ -13,9 +13,7 @@ from torchvision.models.resnet import BasicBlock as BasicBlock
 import utils 
 import time
 from tqdm import tqdm
-import copy 
 import argparse
-import natsort 
 import re 
 import os 
 import sys 
@@ -200,9 +198,9 @@ def forward_grad(features, targets, class_activations, return_nodes):
                 class_activations[index].update({targets[i]: {}})  # ex: {layer_3: {class_0: {} } }
             
             if num in class_activations[index][targets[i]]:
-                class_activations[index][targets[i]][num] += activation
+                class_activations[index][targets[i]][num] += activation.cpu()
             else:
-                class_activations[index][targets[i]].update({num: activation})  # ex: {layer_3: {class_0: {bottleneck_0: activation} } }
+                class_activations[index][targets[i]].update({num: activation.cpu()})  # ex: {layer_3: {class_0: {bottleneck_0: activation} } }
    
     return class_activations 
 
