@@ -125,6 +125,7 @@ def load_checkpoint_module(CHECK_DIR, model_dict):
     checkpoint = torch.load(CHECK_DIR)
     for key in checkpoint['state_dict'].keys(): 
         model_key = key.replace("module.", "")
+        model_key = model_key.replace("model.", "")
         model_dict[model_key] = checkpoint['state_dict'][key] 
 
     return model_dict

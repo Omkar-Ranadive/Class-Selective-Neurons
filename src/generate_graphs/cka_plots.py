@@ -42,7 +42,8 @@ os.makedirs(EXP_DIR, exist_ok=True)
 names = {0: 'Module 4', 1: 'Module 5', 2: 'Module 6', 3: 'Module 7', 4: 'Fully Connected Layer',
          'ft_5':'Unregularized model', 'ft_5_og': 'Original unregularized model', 
          'ft_7': 'Unregularized model2',
-         'ft_5_regN5': 'Reg from epoch 0', 'ft_5_regN5_2': 'Reg from epoch 5'}
+         'ft_5_regN5': 'Reg from epoch 0', 'ft_5_regN5_2': 'Reg from epoch 5', 'rn18_a20e0': 'Reg from epoch 0', 'rn18_a20e5': 'Reg from epoch 5', 
+          'rn34_a20e0': 'Reg from epoch 0', 'rn34_a20e5': 'Reg from epoch 5'}
 
 DATA_DIR = EXP_PATH / args.data_dir
 

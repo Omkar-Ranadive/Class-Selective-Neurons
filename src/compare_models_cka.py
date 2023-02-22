@@ -7,6 +7,7 @@ import utils
 import argparse 
 import os 
 import logging 
+import sys 
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--exp_name", type=str, required=True)
@@ -14,6 +15,7 @@ parser.add_argument("--m1", type=str, required=True)
 parser.add_argument("--m2", type=str, required=True)
 parser.add_argument("--check_min", type=int, default=0)
 parser.add_argument("--check_max", type=int, default=20)
+parser.add_argument("--arc", required=True, type=str)
 
 args = parser.parse_args()
 
@@ -29,13 +31,24 @@ logging.basicConfig(level=logging.INFO, filename=str(EXP_DIR / f'info{args.m1}_a
 logger=logging.getLogger() 
 
 val_dir = IMGNET_PATH / 'val'
-val_loader = utils.load_imagenet_data(dir=val_dir, batch_size=64, num_workers=4)
+val_loader = utils.load_imagenet_data(dir=val_dir, batch_size=256, num_workers=4)
 
 # Setup the models 
-model1 = models.resnet50()
-model2 = models.resnet50()
+if args.arc == 'resnet50':
+        model1 = models.resnet50()
+        model2 = models.resnet50()
+elif args.arc == 'resnet18': 
+        model1 = models.resnet18()
+        model2 = models.resnet18()
+elif args.arc == 'resnet34': 
+        model1 = models.resnet34()
+        model2 = models.resnet34()
+
 m1_dict = model1.state_dict() 
 m2_dict = model2.state_dict()
+
+# for name, layer in model1.named_modules(): 
+#         print(name, layer)
 
 for cp in range(args.check_min, args.check_max+1): 
     logger.info(f"Model1: {args.m1}  Model2: {args.m2} Checkpoint {cp}")  
@@ -45,9 +58,6 @@ for cp in range(args.check_min, args.check_max+1):
 
     model1.load_state_dict(utils.load_checkpoint_module(M1_DIR, m1_dict))
     model2.load_state_dict(utils.load_checkpoint_module(M2_DIR, m2_dict))
-
-    # for name, layer in model1.named_modules(): 
-    #     print(name, layer)
 
     cka = CKA(model1, model2,
             model1_name=args.m1,   # good idea to provide names to avoid confusion
