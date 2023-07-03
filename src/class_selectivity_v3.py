@@ -71,39 +71,27 @@ def get_class_activations(model, val_loader):
             }
         }
     """
-
     class_activations = {
-        4: {},
-        5: {},
-        6: {},
-        7: {}
-    }
+        1: {},
+        2: {},
+        3: {},
+        4: {}, 
+        5: {}, 
+        6: {}
+    }      
+
     counter = 0
 
-    if args.arc == 'resnet50': 
-        return_nodes = {
-                        'layer1.0.relu_2': 4, 'layer1.1.relu_2': 4,'layer1.2.relu_2': 4,
-                        'layer2.0.relu_2': 5,'layer2.1.relu_2': 5, 'layer2.2.relu_2': 5, 'layer2.3.relu_2': 5,
-                        'layer3.0.relu_2': 6, 'layer3.1.relu_2':6, 'layer3.2.relu_2': 6, 'layer3.3.relu_2': 6, 'layer3.4.relu_2': 6, 'layer3.5.relu_2': 6,
-                        'layer4.0.relu_2': 7, 'layer4.1.relu_2': 7, 'layer4.2.relu_2': 7
-                    }
-    elif args.arc == 'resnet18': 
-        return_nodes = {
-                        'layer1.0.relu_1': 4, 'layer1.1.relu_1': 4,
-                        'layer2.0.relu_1': 5, 'layer2.1.relu_1': 5,
-                        'layer3.0.relu_1': 6, 'layer3.1.relu_1': 6,
-                        'layer4.0.relu_1': 7, 'layer4.1.relu_1': 7
-                    }
-    elif args.arc == 'resnet34': 
-        return_nodes = {
-                        'layer1.0.relu_1': 4, 'layer1.1.relu_1': 4, 'layer1.2.relu_1': 4,
-                        'layer2.0.relu_1': 5, 'layer2.1.relu_1': 5, 'layer2.2.relu_1': 5, 'layer2.3.relu_1': 5,
-                        'layer3.0.relu_1': 6, 'layer3.1.relu_1': 6, 'layer3.2.relu_1': 6, 'layer3.3.relu_1': 6, 'layer3.4.relu_1': 6, 'layer3.5.relu_1': 6,
-                        'layer4.0.relu_1': 7, 'layer4.1.relu_1': 7, 'layer4.2.relu_1': 7
-                    }               
+    return_nodes = {
+                    'features.1': 1, 'features.3': 1, 
+                    'features.6': 2, 'features.8': 2,
+                    'features.11': 3, 'features.13': 3, 'features.15': 3,
+                    'features.18': 4, 'features.20': 4, 'features.22': 4,
+                    'features.25': 5, 'features.27': 5, 'features.29': 5,
+                    'classifier.1': 6, 'classifier.4': 6
+                }
 
     feature_extractor = create_feature_extractor(model, return_nodes=list(return_nodes.keys()))
-
 
     with torch.no_grad():
         end = time.time()
@@ -134,11 +122,14 @@ def get_class_selectivity(model, val_loader):
     """
 
     class_selectivity = {
-        4: {},
-        5: {},
-        6: {},
-        7: {}
-    }
+        1: {},
+        2: {},
+        3: {},
+        4: {}, 
+        5: {}, 
+        6: {}
+    }      
+   
     
     # Layer_k = outer layer num, layer_v = dict of the form {class_i: {} ... } 
 
@@ -165,6 +156,69 @@ def get_class_selectivity(model, val_loader):
             class_selectivity[layer_k].update({bottleneck_k: selectivity})
     
     return class_selectivity, class_activations
+
+
+
+def get_class_selectivity_cus_model(checkpoint, val_loader):
+    epsilon = 1e-6
+    checkpoint.eval()
+    model = models.vgg16()
+    model_dict = model.state_dict() 
+    cp_state_dict = checkpoint.state_dict() 
+    for key in cp_state_dict.keys():
+        model_key = key.replace("module.", "")
+        model_key = model_key.replace("model.", "")
+        model_dict[model_key] = cp_state_dict[key]
+
+    model.load_state_dict(model_dict)
+
+    class_activations = get_class_activations(model, val_loader)
+
+    """
+    format --> {
+        layer: {
+            bottleneck number: [class selectivity per channel]
+            }
+        }
+    """
+
+    class_selectivity = {
+        1: {},
+        2: {},
+        3: {},
+        4: {}, 
+        5: {}, 
+        6: {}
+    }      
+   
+    
+    # Layer_k = outer layer num, layer_v = dict of the form {class_i: {} ... } 
+
+
+    for layer_k, layer_v in class_activations.items():
+        # for class_k, class_v in class_activations[layer_k].items():
+        # For a layer, the number of bottleneck layers will be the same 
+        # So, just choose any class (in this case class 0) to get the index of bottleneck layers 
+        for bottleneck_k, bottleneck_v in class_activations[layer_k][0].items():
+            for class_k in sorted(class_activations[layer_k].keys()):
+                if class_k > 0:
+                    all_activations_for_this_bottleneck = np.concatenate((all_activations_for_this_bottleneck, class_activations[layer_k][class_k][bottleneck_k]), axis=0)
+                else:
+                    all_activations_for_this_bottleneck = class_activations[layer_k][class_k][bottleneck_k]
+            
+            all_activations_for_this_bottleneck = all_activations_for_this_bottleneck.T
+
+            u_max = np.max(all_activations_for_this_bottleneck, axis=1)
+            u_sum = np.sum(all_activations_for_this_bottleneck, axis=1)
+            u_minus_max = (u_sum - u_max) / (all_activations_for_this_bottleneck.shape[1] - 1)
+
+            selectivity = (u_max - u_minus_max) / (u_max + u_minus_max + epsilon)
+            
+            class_selectivity[layer_k].update({bottleneck_k: selectivity})
+    
+    return class_selectivity, class_activations
+
+
 
 
 def forward_grad(features, targets, class_activations, return_nodes): 
@@ -203,75 +257,3 @@ def forward_grad(features, targets, class_activations, return_nodes):
                 class_activations[index][targets[i]].update({num: activation.cpu()})  # ex: {layer_3: {class_0: {bottleneck_0: activation} } }
    
     return class_activations 
-
-    
-    
-def calculate_selectivity(data_dir, loader, check_min, check_max): 
-
-    dir = IMGNET_PATH / loader
-
-    # Load pre-trained Resnet 
-    if args.arc == 'resnet50':
-        model = models.resnet50()
-
-    elif args.arc == 'resnet18': 
-        model = models.resnet18()
-
-    elif args.arc == 'resnet34': 
-        model = models.resnet34()
-
-
-    model_dict = model.state_dict() 
-
-    loader_cp = utils.load_imagenet_data(dir=dir, batch_size=256, num_workers=8)
-
-    for cp in range(check_min, check_max+1):
-        print(f"Calculating class selctivity for cp {cp}")
-        
-        cs_dict_path = data_dir / 'cs_dict_{}_cp{}'.format(loader, cp)
-
-        checkpoint = torch.load(data_dir / f'checkpoint_e{cp}.pth.tar')
-
-        # Load checkpoint state dict into the model 
-        """
-        The key values in checkpoint have different key names, they have an additional "module." in their name 
-        Therefore, cleaning the keys before updating state dict of the model 
-        """
-
-        for key in checkpoint['state_dict'].keys(): 
-            model_key = key.replace("module.", "")
-            model_key = model_key.replace("model.", "")
-            model_dict[model_key] = checkpoint['state_dict'][key] 
-
-        model.load_state_dict(model_dict)
-        model.eval()
-        
-
-
-        if not cs_dict_path.is_file(): 
-            class_selectivity, class_activations = get_class_selectivity(model=model, val_loader=loader_cp) 
-            utils.save_file(class_selectivity, data_dir / 'cs_dict_{}_cp{}'.format(loader, cp))
-            utils.save_file(class_activations, data_dir / 'cs_dict_{}_cp{}_full'.format(loader, cp))
-
-
-if __name__ == '__main__': 
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--exp_name", type=str, required=True)
-    parser.add_argument("--img_dir", type=str, default=IMGNET_PATH)
-    parser.add_argument("--loader", default='val', type=str)
-    parser.add_argument("--arc", default='resnet50', type=str)
-    parser.add_argument("--check_min", type=int, default=0)
-    parser.add_argument("--check_max", type=int, default=90)
-    args = parser.parse_args()
-
-    data_dir = DATA_PATH / args.exp_name
-
-    calculate_selectivity(data_dir, args.loader, args.check_min, args.check_max)
-    
-    # model = models.resnet50(pretrained=True)
-    # loader = 'val'
-    # loader_cp = utils.load_imagenet_data(dir=IMGNET_PATH / loader, batch_size=128, num_workers=8)
-    # class_selectivity, class_activations = get_class_selectivity(model=model, val_loader=loader_cp) 
-    # utils.save_file(class_selectivity, data_dir / 'cs_dict_r50_new')
-    # utils.save_file(class_activations, data_dir / 'cs_dict_r50_new_full')

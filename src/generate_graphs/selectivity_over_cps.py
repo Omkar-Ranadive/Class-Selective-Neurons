@@ -47,6 +47,8 @@ if args.arc == 'resnet50':
     channels = {4: 256, 5: 512, 6: 1024, 7: 2048}
 elif args.arc == 'resnet18' or args.arc == 'resnet34':
     channels = {4: 64, 5: 128, 6: 256, 7: 512}
+elif args.arc == 'vgg16': 
+    channels = {1: 64, 2: 128, 3: 256, 4: 512, 5: 512, 6: 4096}
 
 
 checkpoints_to_load = [i for i in range(args.check_min, args.check_max+1)]

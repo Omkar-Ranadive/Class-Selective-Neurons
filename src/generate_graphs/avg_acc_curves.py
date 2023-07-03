@@ -22,6 +22,7 @@ parser.add_argument("--check_min", required=True, type=int)
 parser.add_argument("--check_max", required=True, type=int)
 parser.add_argument("--key", type=str, required=True)
 parser.add_argument("--format", type=str, default='pdf')
+parser.add_argument("--arc", type=str, required=True)
 parser.add_argument("--dpi", default=300, type=int)
 args = parser.parse_args()
 
@@ -42,15 +43,21 @@ colors[0], colors[2] = colors[2], colors[0]
 fig1, ax1 = plt.subplots()
 ax1.xaxis.set_major_locator(plt.MaxNLocator(nbins=6, integer=True))
 
-dirs_og = ['rn50_1', 'rn50_2', 'rn50_3', 'rn50_4', 'rn50_5']
-dirs_e0 = ['rn50_a20e0_1', 'rn50_a20e0_2', 'rn50_a20e0_3', 'rn50_a20e0_4', 'rn50_a20e0_5']
-dirs_e5 = ['rn50_a20e5_1', 'rn50_a20e5_2', 'rn50_a20e5_3', 'rn50_a20e5_4', 'rn50_a20e5_5']
+if args.arc == 'resnet50':
+    dirs_og = ['rn50_1', 'rn50_2', 'rn50_3', 'rn50_4', 'rn50_5']
+    dirs_e0 = ['rn50_a20e0_1', 'rn50_a20e0_2', 'rn50_a20e0_3', 'rn50_a20e0_4', 'rn50_a20e0_5']
+    dirs_e5 = ['rn50_a20e5_1', 'rn50_a20e5_2', 'rn50_a20e5_3', 'rn50_a20e5_4', 'rn50_a20e5_5']
+    all_dirs = [dirs_og, dirs_e0, dirs_e5]
+elif args.arc == 'vgg16': 
+    dirs_og = ['vgg16_1', 'vgg16_2', 'vgg16_3', 'vgg16_4', 'vgg16_5']
+    all_dirs = [dirs_og]
+
 names = ['Original unregularized model', 'Regularized from epoch 0 onward', 'Regularized from epoch 5 onward']
 key_names = {'train_acc1': 'Train Accuracy', 'val_acc1': 'Val Accuracy', 'val_acc5': 'Val Accuracy', 'train_acc5': 'Train Accuracy'}
 markers = ['o', '^', 'X']
 
 
-for index, dirs in enumerate([dirs_og, dirs_e0, dirs_e5]): 
+for index, dirs in enumerate(all_dirs): 
     all_accs = []
     print("Dir len", len(dirs))
     for dir in dirs: 
@@ -63,7 +70,7 @@ for index, dirs in enumerate([dirs_og, dirs_e0, dirs_e5]):
                     cp_num = re.search('e\d+', cp).group()[1:]
                     if args.check_min <= int(cp_num) <= args.check_max: 
                         cur_cp = torch.load(DATA_DIR / cp)
-                        acc = cur_cp[args.key] if isinstance(cur_cp[args.key], int) else cur_cp[args.key].item()
+                        acc = cur_cp[args.key] if (isinstance(cur_cp[args.key], int) or isinstance(cur_cp[args.key], float)) else cur_cp[args.key].item()
                         accs.append(acc)
         all_accs.append(accs)
 

@@ -3,7 +3,7 @@ from pathlib import Path
 PARENT_PATH = Path(__file__).parent
 DATA_PATH = PARENT_PATH / '../data'
 # DATA_PATH = Path('/mnt/data/omkar/CSN/data')
-IMGNET_PATH = DATA_PATH / 'ImageNet'
+IMGNET_PATH = DATA_PATH / 'imagenet'
 EXP_PATH = PARENT_PATH / '../experiments' 
 
 

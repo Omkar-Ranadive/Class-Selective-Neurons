@@ -12,6 +12,46 @@ from constants import *
 import utils
 import seaborn as sns 
 from matplotlib.ticker import AutoMinorLocator
+import torch 
+
+
+def get_selectivity(cs_dict_path, classes):
+
+    class_selectivity = {
+        4: {},
+        5: {},
+        6: {},
+        7: {}
+    }
+    
+    class_activations = utils.load_file(cs_dict_path)
+    print(f"Calculating for epoch {cp}")
+    for layer_k, layer_v in class_activations.items():
+        # for class_k, class_v in class_activations[layer_k].items():
+        # For a layer, the number of bottleneck layers will be the same 
+        # So, just choose any class (in this case class 0) to get the index of bottleneck layers 
+        for bottleneck_k, bottleneck_v in class_activations[layer_k][0].items():
+            for index, class_k in enumerate(classes):
+                if index > 0:
+                    all_activations_for_this_bottleneck = np.concatenate((all_activations_for_this_bottleneck, class_activations[layer_k][class_k][bottleneck_k]), axis=0)
+                else:
+                    all_activations_for_this_bottleneck = class_activations[layer_k][class_k][bottleneck_k]
+            
+            all_activations_for_this_bottleneck = all_activations_for_this_bottleneck.T
+
+            u_max = np.max(all_activations_for_this_bottleneck, axis=1)
+            # print(all_activations_for_this_bottleneck.shape)
+            # avg_act = torch.mean(all_activations_for_this_bottleneck, dim=0).numpy()
+            # print(avg_act.shape)
+            u_sum = np.sum(all_activations_for_this_bottleneck, axis=1)
+            u_minus_max = (u_sum - u_max) / (all_activations_for_this_bottleneck.shape[1] - 1)
+
+            selectivity = (u_max - u_minus_max) / (u_max + u_minus_max + EPSILON)
+            
+            class_selectivity[layer_k].update({bottleneck_k: selectivity})
+    
+    return class_selectivity
+
 
 
 parser = argparse.ArgumentParser()
@@ -24,7 +64,10 @@ parser.add_argument("--arc", default='resnet50', type=str)
 parser.add_argument("--bins", default=6, type=int)
 parser.add_argument("--format", type=str, default='pdf')
 parser.add_argument("--dpi", default=300, type=int)
+parser.add_argument("--cmin", type=int, required=True) 
+parser.add_argument("--cmax", type=int, required=True) 
 
+# Refer class names here: https://gist.github.com/yrevar/942d3a0ac09ec9e5eb3a
 
 args = parser.parse_args()
 
@@ -42,24 +85,16 @@ else:
 
 if args.arc == 'resnet50':
     channels = {4: 256, 5: 512, 6: 1024, 7: 2048}
-    dirs_og = ['rn50_1', 'rn50_2', 'rn50_3', 'rn50_4', 'rn50_5']
-    dirs_e0 = ['rn50_a20e0_1', 'rn50_a20e0_2', 'rn50_a20e0_3', 'rn50_a20e0_4', 'rn50_a20e0_5']
-    dirs_e5 = ['rn50_a20e5_1', 'rn50_a20e5_2', 'rn50_a20e5_3', 'rn50_a20e5_4', 'rn50_a20e5_5']
-    names = ['Original unregularized model', 'Regularized from epoch 0 onward', 'Regularized from epoch 5 onward']
-    all_dirs = [dirs_og, dirs_e0, dirs_e5]
-
 elif args.arc == 'resnet18' or args.arc == 'resnet34':
     channels = {4: 64, 5: 128, 6: 256, 7: 512}
-elif args.arc == 'vgg16': 
-    # channels = {1: 64, 2: 128, 3: 256, 4: 512, 5: 512, 6: 4096}
-    channels = {1: 64, 2: 128, 3: 256, 4: 512, 5: 512}
-    dirs_og = ['vgg16_1', 'vgg16_2', 'vgg16_3', 'vgg16_4', 'vgg16_5']
-    names = ['Original unregularized model']
 
-    all_dirs = [dirs_og]
-
+dirs_og = ['rn50_1', 'rn50_2', 'rn50_3', 'rn50_4', 'rn50_5']
+dirs_e0 = ['rn50_a20e0_1', 'rn50_a20e0_2', 'rn50_a20e0_3', 'rn50_a20e0_4', 'rn50_a20e0_5']
+dirs_e5 = ['rn50_a20e5_1', 'rn50_a20e5_2', 'rn50_a20e5_3', 'rn50_a20e5_4', 'rn50_a20e5_5']
+names = ['Original unregularized model', 'Regularized from epoch 0 onward', 'Regularized from epoch 5 onward']
 
 checkpoints_to_load = [i for i in range(args.check_min, args.check_max+1)]
+classes = list(range(args.cmin, args.cmax+1))
 
 cs_for_every_cp = []
 
@@ -74,7 +109,7 @@ fig2, ax2 = plt.subplots()
 
 
 
-for dir_index, dirs in enumerate(all_dirs):
+for dir_index, dirs in enumerate([dirs_og]):
     if dir_index == 0: 
         cmap = plt.get_cmap('Greens') 
     elif dir_index == 1: 
@@ -85,7 +120,7 @@ for dir_index, dirs in enumerate(all_dirs):
     ax2.set_xlabel('Epochs')
     ax2.set_ylabel('Class Selectivity Index')
     ax2.xaxis.set_major_locator(plt.MaxNLocator(nbins=args.bins, integer=True))
-    ax2.set_title(f'{names[dir_index]}')
+    ax2.set_title(f'Selectivity Index for Classes: {args.cmin}-{args.cmax}')
     ax2.set_ylim(top=0.75)
 
     ax2.xaxis.set_minor_locator(plt.MultipleLocator(1))
@@ -100,8 +135,8 @@ for dir_index, dirs in enumerate(all_dirs):
         DATA_DIR = DATA_PATH / dir 
         cs_for_every_cp = []
         for cp in checkpoints_to_load:
-            cs_dict_path = DATA_DIR / 'cs_dict_{}_cp{}'.format(args.loader, cp)
-            class_selectivity = utils.load_file(cs_dict_path)
+            cs_dict_path = DATA_DIR / 'cs_dict_{}_cp{}_full'.format(args.loader, cp)
+            class_selectivity = get_selectivity(cs_dict_path, classes)
             cs_for_every_cp.append(class_selectivity)
 
         cs_dirs.append(cs_for_every_cp)
@@ -170,11 +205,13 @@ for dir_index, dirs in enumerate(all_dirs):
         elif dir_index == 2: 
             ax2.vlines(5, 0, 0.75, color='k', alpha=0.7, linestyles='dashed')
             
-        fig1.savefig(SAVE_DIR / f'{names[dir_index]}_l{l}_cp{args.check_min}_to_cp{args.check_max}.{args.format}', format=args.format)
+        fig1.savefig(SAVE_DIR / f'{names[dir_index]}_l{l}_cp{args.check_min}_to_cp{args.check_max}_c{args.cmin}_c{args.cmax}.{args.format}', 
+                     format=args.format)
 
         ax1.clear()
 
-    fig2.savefig(SAVE_DIR / f'{names[dir_index]}_All_Modules_cp{args.check_min}_to_cp{args.check_max}.{args.format}', format=args.format)
+    fig2.savefig(SAVE_DIR / f'{names[dir_index]}_All_Modules_cp{args.check_min}_to_cp{args.check_max}c{args.cmin}_c{args.cmax}.{args.format}', 
+                 format=args.format)
 
     ax2.clear()
 

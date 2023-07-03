@@ -51,3 +51,39 @@ class NewModel(nn.Module):
         out = self.model(x)
         return out, self.features
 
+
+class VGGModel(nn.Module):
+    def __init__(self, arch, pretrained=False, *args):
+        super().__init__(*args)
+        self.features = {}
+
+        self.model = models.vgg16()
+
+        self.return_nodes = {
+                        'features.1': 1, 'features.3': 1, 
+                        'features.6': 2, 'features.8': 2,
+                        'features.11': 3, 'features.13': 3, 'features.15': 3,
+                        'features.18': 4, 'features.20': 4, 'features.22': 4,
+                        'features.25': 5, 'features.27': 5, 'features.29': 5,
+                        'classifier.1': 6, 'classifier.4': 6
+                    }
+
+        # Generate hooks for the points of interest (i.e, output point at which we calculate selectivity)
+        layers = [self.model.features, self.model.classifier]
+        for k in self.return_nodes.keys():
+            splits = k.split(".")
+            lnum = 0 if splits[0] == 'features' else 1 
+            bnum = int(splits[1])
+            layers[lnum][bnum].register_forward_hook(self.forward_hook(k))
+
+
+    def forward_hook(self, layer_name):
+        def hook(module, input, output):
+            self.features[layer_name] = output
+        return hook
+
+
+    def forward(self, x):
+        out = self.model(x)
+        return out, self.features
+

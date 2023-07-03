@@ -162,11 +162,14 @@ def compare_cp_acc(dirs, key):
                     if args.check_min is not None and args.check_max is not None: 
                         if args.check_min <= int(cp_num) <= args.check_max: 
                             cur_cp = torch.load(DATA_DIR / cp)
-                            acc = cur_cp[key] if isinstance(cur_cp[key], int) else cur_cp[key].item()
+                            acc = cur_cp[key] if (isinstance(cur_cp[key], float) or isinstance(cur_cp[key], int)) else cur_cp[key].item()
                             accs.append(acc)
                     else: 
                         cur_cp = torch.load(DATA_DIR / cp)
-                        acc = cur_cp[key] if isinstance(cur_cp[key], int) else cur_cp[key].item()
+                        if (isinstance(cur_cp[key], float) or isinstance(cur_cp[key], int)):
+                            acc = cur_cp[key] 
+                        else:
+                            cur_cp[key].item()
                         accs.append(acc)
             
         plt.plot(range(0, len(accs)), accs, label='{}'.format(dir), alpha=0.8)
